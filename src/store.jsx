@@ -123,11 +123,8 @@ export function AppProvider({ children }) {
     return startSession(res.token)
   }
 
-  /** Acceso de demostración: solo existe con el perfil `dev` del backend. */
-  const devLogin = async (email, name) => {
-    const res = await api('/dev/login', { method: 'POST', body: { email, name }, auth: false })
-    return startSession(res.token)
-  }
+  /** Recorrido MVP: sesión simulada en el navegador, sin pasar por el backend. */
+  const enterDemo = (role) => startSession(`demo:${role}`)
 
   const completeProfile = async (name) => {
     const user = await api('/me/profile', { method: 'PUT', body: { name } })
@@ -221,7 +218,7 @@ export function AppProvider({ children }) {
     setSessionNotice,
     requestCode,
     verifyCode,
-    devLogin,
+    enterDemo,
     completeProfile,
     logout,
     withReauth,

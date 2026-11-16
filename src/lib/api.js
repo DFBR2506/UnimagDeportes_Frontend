@@ -1,18 +1,13 @@
 // Cliente HTTP de la API Unimag Deportes (Spring Boot).
 // Contratos: Unimag-Deportes/docs/techincal-plan/contracts/README.md
 
+import { ApiError } from '@/lib/apiError'
+import { isDemoToken, mockRequest } from '@/lib/mockApi'
+
+export { ApiError }
+
 const BASE = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
 const TOKEN_KEY = 'ud-token'
-
-/** Error con la forma común de la API: { code, message, details }. */
-export class ApiError extends Error {
-  constructor(status, { code, message, details } = {}) {
-    super(message || 'No pudimos completar la solicitud.')
-    this.status = status
-    this.code = code ?? (status === 0 ? 'NETWORK_ERROR' : 'UNKNOWN_ERROR')
-    this.details = details ?? {}
-  }
-}
 
 // RN-55: el token viaja solo en Authorization; se guarda en el navegador, nunca en cookies ni URL.
 let token = null
@@ -69,6 +64,9 @@ const parseError = async (res) => {
  * @param {object} opts  { method, body (JSON), form (FormData), query, as: 'json'|'text'|'blob', auth, signal }
  */
 export async function api(path, { method = 'GET', body, form, query, as = 'json', auth = true, signal } = {}) {
+  // Recorrido MVP: la sesión de demostración se atiende en el navegador, sin backend.
+  if (isDemoToken(token)) return mockRequest(token, path, { method, body, form, query, as })
+
   const headers = {}
   if (auth && token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -104,6 +102,7 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
  * Devuelve una función para cerrar el flujo.
  */
 export function openEventStream(path, onEvent) {
+  if (isDemoToken(token)) return () => {} // sin backend no hay flujo en vivo
   const controller = new AbortController()
   ;(async () => {
     while (!controller.signal.aborted) {
