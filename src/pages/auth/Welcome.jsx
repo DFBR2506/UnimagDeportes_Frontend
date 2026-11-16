@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, CalendarCheck2, QrCode, ShieldCheck, Timer, UserRound } from 'lucide-react'
 import SmoothButton from '@/components/smoothui/smooth-button'
 import Separator from '@/components/smoothui/separator'
@@ -14,25 +15,35 @@ const FEATURES = [
 
 export default function Welcome() {
   const navigate = useNavigate()
-  const { login, setName } = useApp()
+  const location = useLocation()
+  const { me, enterDemo } = useApp()
+  const [pending, setPending] = useState(null)
 
-  // Acceso MVP: entra directo con una sesión simulada, sin pasar por el código.
-  const demo = (role) => {
-    if (role === 'admin') {
-      login('admin.deportes@unimagdalena.edu.co')
-      setName('Equipo de Deportes')
-      navigate('/admin')
-    } else {
-      login('maria.perez@unimagdalena.edu.co')
-      setName('María Pérez')
-      navigate('/app/inicio')
+  if (me && !me.needsName) {
+    return <Navigate to={me.role === 'ADMIN' ? '/admin' : '/app/inicio'} replace />
+  }
+
+  // Recorrido MVP: entra directo con una sesión simulada (datos del prototipo), sin backend ni código.
+  const demo = async (role) => {
+    setPending(role)
+    try {
+      await enterDemo(role)
+      navigate(role === 'admin' ? '/admin' : '/app/inicio')
+    } finally {
+      setPending(null)
     }
   }
 
   return (
     <motion.div className="space-y-8" {...staggerParent}>
       <motion.div className="space-y-3" {...staggerChild}>
-        <h1 className="font-display text-4xl font-bold tracking-tight text-foreground">
+        <img
+          alt="Área Deportes · Unimagdalena – Bienestar Universitario"
+          className="mx-auto mb-4 size-24 drop-shadow-md sm:size-28"
+          draggable={false}
+          src="/logo.svg"
+        />
+        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           Reserva tu espacio
         </h1>
         <p className="text-lg text-muted-foreground">
@@ -47,10 +58,10 @@ export default function Welcome() {
         {FEATURES.map(({ icon: Icon, text }) => (
           <motion.li
             key={text}
-            className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm text-card-foreground shadow-xs"
+            className="flex items-center gap-3 rounded-xl border border-border bg-background/60 text-left px-4 py-3 text-sm text-card-foreground shadow-xs"
             {...staggerChild}
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent-ink">
               <Icon className="size-4" />
             </span>
             {text}
@@ -65,7 +76,7 @@ export default function Welcome() {
           variant="candy"
           size="lg"
           suffix={<ArrowRight />}
-          onClick={() => navigate('/acceso')}
+          onClick={() => navigate('/acceso', { state: location.state })}
         >
           Iniciar sesión
         </SmoothButton>
@@ -83,15 +94,15 @@ export default function Welcome() {
           <Separator className="flex-1" />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <SmoothButton color="accent" onClick={() => demo('student')} prefix={<UserRound />} variant="soft">
+          <SmoothButton className="px-3" color="accent" loading={pending === 'student'} onClick={() => demo('student')} prefix={<UserRound />} variant="soft">
             Entrar como estudiante
           </SmoothButton>
-          <SmoothButton color="amber" onClick={() => demo('admin')} prefix={<ShieldCheck />} variant="soft">
+          <SmoothButton className="px-3" color="amber" loading={pending === 'admin'} onClick={() => demo('admin')} prefix={<ShieldCheck />} variant="soft">
             Entrar como administrador
           </SmoothButton>
         </div>
         <p className="text-center text-xs text-muted-foreground">
-          Sesión simulada para la demo, sin código de acceso.
+          Sesión simulada con datos de ejemplo: no usa el backend ni pide código.
         </p>
       </motion.div>
     </motion.div>

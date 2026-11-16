@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { Pencil, Plus, Search } from 'lucide-react'
+import { ImageUp, MapPinned, Pencil, Plus, Search } from 'lucide-react'
 import Input from '@/components/smoothui/input'
 import SmoothButton from '@/components/smoothui/smooth-button'
 import Badge from '@/components/smoothui/badge'
@@ -9,38 +9,123 @@ import Field, { FieldLabel } from '@/components/smoothui/field'
 import NumberField from '@/components/smoothui/number-field'
 import Select from '@/components/smoothui/select'
 import Checkbox from '@/components/smoothui/checkbox'
+import Empty from '@/components/smoothui/empty'
+import Skeleton from '@/components/smoothui/skeleton'
 import { toast } from '@/components/smoothui/toast'
 import PageHeader from '@/components/app/PageHeader'
+import CourtArt, { courtKind } from '@/components/app/CourtArt'
+import useAdminSpaces from '@/lib/useAdminSpaces'
+import useSpaceImage, { invalidateSpaceImage } from '@/lib/useSpaceImage'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
-import { DISCIPLINES, formatHour } from '@/data/mock'
+import { api, errorMessage } from '@/lib/api'
+import { DISCIPLINES, disciplineName, formatHour, toHHmm } from '@/data/domain'
 import { useApp } from '@/store'
+import { cn } from '@/lib/utils'
 
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 5) // 5:00 → 21:00
+const OPEN_HOURS = Array.from({ length: 23 }, (_, i) => i) // 0:00 → 22:00
+const CLOSE_HOURS = Array.from({ length: 23 }, (_, i) => i + 1) // 1:00 → 23:00
+const MAX_IMAGE_BYTES = 31_457_280 // 30 MiB por archivo
 
 const emptyForm = {
   id: null,
   name: '',
   disciplines: [],
   aforo: 10,
-  open: 8,
-  close: 20,
+  requirements: '',
+  open: 6,
+  close: 22,
   estado: 'activo',
 }
 
+function SpaceThumb({ space, version }) {
+  const image = useSpaceImage(space.id, 'PREVIEW', version)
+  return (
+    <div className="aspect-[16/10] w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+      {image ? (
+        <img alt="" className="h-full w-full object-cover" src={image} />
+      ) : (
+        <CourtArt kind={courtKind(space)} />
+      )}
+    </div>
+  )
+}
+
+/** Selector de imagen con vista previa local (PREVIEW o PANORAMA). */
+function ImagePicker({ label, hint, file, onChange, required, current, wide }) {
+  const local = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
+  useEffect(() => () => local && URL.revokeObjectURL(local), [local])
+  const preview = local ?? current
+  return (
+    <Field>
+      <FieldLabel>
+        {label}
+        {required && <span className="text-destructive-ink"> *</span>}
+      </FieldLabel>
+      <label
+        className={cn(
+          'group relative flex cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/50 text-sm text-muted-foreground transition-colors hover:border-accent hover:bg-accent/5 focus-ring-within',
+          wide ? 'aspect-[3/1]' : 'aspect-[16/10]'
+        )}
+      >
+        {preview ? (
+          <img alt="" className="absolute inset-0 h-full w-full object-cover" src={preview} />
+        ) : (
+          <span className="flex flex-col items-center gap-1.5 px-3 text-center">
+            <ImageUp className="size-5" />
+            {hint}
+          </span>
+        )}
+        {preview && (
+          <span className="absolute inset-x-2 bottom-2 rounded-md bg-sidebar/80 px-2 py-1 text-center text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+            Cambiar imagen
+          </span>
+        )}
+        <input
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (!f) return
+            if (f.size > MAX_IMAGE_BYTES) {
+              toast.error('Imagen demasiado grande', { description: 'El máximo es 30 MB por archivo.' })
+              return
+            }
+            onChange(f)
+          }}
+          type="file"
+        />
+      </label>
+    </Field>
+  )
+}
+
+function ExistingImage({ id, kind, version, children }) {
+  return children(useSpaceImage(id, kind, version))
+}
+
 export default function AdminSpaces() {
-  const { spaces, saveSpace, disciplineById } = useApp()
+  const { spaces, loaded, error, reload } = useAdminSpaces()
+  const { refreshSpaces } = useApp()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [images, setImages] = useState({ PREVIEW: null, PANORAMA: null })
+  const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [imageVersion, setImageVersion] = useState(0)
 
   const visible = spaces.filter((s) => s.name.toLowerCase().includes(query.trim().toLowerCase()))
 
   const openCreate = () => {
     setForm(emptyForm)
+    setImages({ PREVIEW: null, PANORAMA: null })
+    setFieldErrors({})
     setOpen(true)
   }
   const openEdit = (space) => {
     setForm({ ...space })
+    setImages({ PREVIEW: null, PANORAMA: null })
+    setFieldErrors({})
     setOpen(true)
   }
 
@@ -51,22 +136,66 @@ export default function AdminSpaces() {
     }))
   }
 
-  const save = () => {
-    const id = form.id ?? form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    saveSpace({ ...form, id, aforo: Number(form.aforo) })
-    setOpen(false)
-    toast.success(form.id ? 'Espacio actualizado' : 'Espacio creado', {
-      description: form.name,
-    })
+  const payload = () => ({
+    name: form.name.trim(),
+    capacity: Number(form.aforo),
+    requirements: form.requirements.trim() || null,
+    openingTime: toHHmm(form.open),
+    closingTime: toHHmm(form.close),
+    status: form.estado === 'activo' ? 'ACTIVE' : 'MAINTENANCE',
+    disciplines: form.disciplines,
+  })
+
+  const save = async () => {
+    setSaving(true)
+    setFieldErrors({})
+    try {
+      if (form.id) {
+        // PUT /admin/spaces/{id} (JSON) y, si se eligieron, las imágenes por separado.
+        await api(`/admin/spaces/${form.id}`, { method: 'PUT', body: payload() })
+        for (const kind of ['PREVIEW', 'PANORAMA']) {
+          if (!images[kind]) continue
+          const data = new FormData()
+          data.append('image', images[kind])
+          await api(`/admin/spaces/${form.id}/images/${kind}`, { method: 'PUT', form: data })
+          invalidateSpaceImage(form.id, kind)
+        }
+        setImageVersion((v) => v + 1)
+      } else {
+        // POST /admin/spaces (multipart): parte JSON `space` + imágenes obligatorias.
+        const data = new FormData()
+        data.append('space', new Blob([JSON.stringify(payload())], { type: 'application/json' }))
+        data.append('preview', images.PREVIEW)
+        data.append('panorama', images.PANORAMA)
+        await api('/admin/spaces', { method: 'POST', form: data })
+      }
+      toast.success(form.id ? 'Espacio actualizado' : 'Espacio creado', { description: form.name })
+      setOpen(false)
+      await reload()
+      refreshSpaces().catch(() => {})
+    } catch (err) {
+      setFieldErrors(err.details?.fields ?? {})
+      toast.error('No se pudo guardar el espacio', { description: errorMessage(err) })
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const valid = form.name.trim() && form.disciplines.length > 0 && form.open < form.close
+  const valid =
+    form.name.trim() &&
+    form.disciplines.length > 0 &&
+    form.open < form.close &&
+    Number(form.aforo) > 0 &&
+    (form.id || (images.PREVIEW && images.PANORAMA))
+
+  const fieldError = (key) =>
+    fieldErrors[key] ? <p className="text-xs text-destructive-ink">{fieldErrors[key]}</p> : null
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Espacios y franjas"
-        subtitle="Administra espacios, horarios de operación y estados."
+        title="Espacios"
+        subtitle="Administra espacios, horarios de operación, estados e imágenes."
         actions={
           <SmoothButton color="accent" onClick={openCreate} prefix={<Plus />} variant="candy">
             Crear espacio
@@ -83,7 +212,7 @@ export default function AdminSpaces() {
         <Field>
           <FieldLabel>Buscar espacio</FieldLabel>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-9" onValueChange={setQuery} placeholder="Cancha…" value={query} />
           </div>
         </Field>
@@ -95,63 +224,91 @@ export default function AdminSpaces() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.45 }}
       >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-6 py-4 font-medium">Nombre</th>
-                <th className="px-6 py-4 font-medium">Disciplina(s)</th>
-                <th className="px-6 py-4 font-medium">Aforo</th>
-                <th className="px-6 py-4 font-medium">Horario</th>
-                <th className="px-6 py-4 font-medium">Estado</th>
-                <th className="px-6 py-4 font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <motion.tbody {...staggerParent}>
-              {visible.map((space) => (
-                <motion.tr
-                  key={space.id}
-                  className="border-b border-border/60 last:border-0"
-                  {...staggerChild}
-                >
-                  <td className="px-6 py-4 font-medium text-card-foreground">{space.name}</td>
-                  <td className="px-6 py-4 text-muted-foreground">
-                    {space.disciplines.map((d) => disciplineById(d)?.name).join(', ')}
-                  </td>
-                  <td className="px-6 py-4 tabular-nums text-muted-foreground">{space.aforo}</td>
-                  <td className="px-6 py-4 text-muted-foreground">
-                    {formatHour(space.open)}–{formatHour(space.close)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant={space.estado === 'activo' ? 'success' : 'warning'}>
-                      {space.estado === 'activo' ? 'Activo' : 'Mantenimiento'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <SmoothButton
-                      onClick={() => openEdit(space)}
-                      prefix={<Pencil />}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Editar
-                    </SmoothButton>
-                  </td>
-                </motion.tr>
-              ))}
-            </motion.tbody>
-          </table>
-        </div>
+        {!loaded ? (
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : error ? (
+          <p className="p-6 text-sm text-destructive-ink">{errorMessage(error)}</p>
+        ) : spaces.length === 0 ? (
+          <Empty
+            className="py-14"
+            description="Crea el primer espacio con su imagen de vista previa y su panorámica 360°."
+            icon={<MapPinned className="size-6" />}
+            title="Aún no hay espacios"
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
+                  <th className="px-6 py-4 font-medium">Nombre</th>
+                  <th className="px-6 py-4 font-medium">Disciplina(s)</th>
+                  <th className="px-6 py-4 font-medium">Aforo</th>
+                  <th className="px-6 py-4 font-medium">Horario</th>
+                  <th className="px-6 py-4 font-medium">Estado</th>
+                  <th className="px-6 py-4 font-medium">Acciones</th>
+                </tr>
+              </thead>
+              <motion.tbody {...staggerParent}>
+                {visible.map((space) => (
+                  <motion.tr
+                    key={space.id}
+                    className="border-b border-border/60 last:border-0"
+                    {...staggerChild}
+                  >
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <SpaceThumb space={space} version={imageVersion} />
+                        <span className="font-medium text-card-foreground">{space.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-muted-foreground">
+                      {space.disciplines.map(disciplineName).join(', ')}
+                    </td>
+                    <td className="px-6 py-3 text-muted-foreground tabular-nums">{space.aforo}</td>
+                    <td className="px-6 py-3 text-muted-foreground">
+                      {formatHour(space.open)}–{formatHour(space.close)}
+                    </td>
+                    <td className="px-6 py-3">
+                      <Badge variant={space.estado === 'activo' ? 'success' : 'warning'}>
+                        {space.estado === 'activo' ? 'Activo' : 'Mantenimiento'}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-3">
+                      <SmoothButton
+                        onClick={() => openEdit(space)}
+                        prefix={<Pencil />}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Editar
+                      </SmoothButton>
+                    </td>
+                  </motion.tr>
+                ))}
+              </motion.tbody>
+            </table>
+          </div>
+        )}
       </motion.section>
 
       <Dialog
-        description="RN-09: un espacio en mantenimiento no aparece como reservable."
+        className="sm:max-w-2xl"
+        description="RN-09: un espacio en mantenimiento no aparece como reservable. Los cambios rigen para reservas nuevas."
         footer={
           <div className="flex justify-end gap-3">
             <SmoothButton onClick={() => setOpen(false)} variant="outline">
               Cancelar
             </SmoothButton>
-            <SmoothButton color="accent" disabled={!valid} onClick={save} variant="candy">
+            <SmoothButton
+              color="accent"
+              disabled={!valid}
+              loading={saving}
+              onClick={save}
+              variant="candy"
+            >
               {form.id ? 'Guardar cambios' : 'Crear espacio'}
             </SmoothButton>
           </div>
@@ -160,7 +317,7 @@ export default function AdminSpaces() {
         open={open}
         title={form.id ? 'Editar espacio' : 'Crear espacio'}
       >
-        <div className="space-y-5 py-2">
+        <div className="max-h-[65dvh] space-y-5 overflow-y-auto py-2 pr-1">
           <Field>
             <FieldLabel>Nombre</FieldLabel>
             <Input
@@ -168,11 +325,12 @@ export default function AdminSpaces() {
               placeholder="Cancha…"
               value={form.name}
             />
+            {fieldError('name')}
           </Field>
 
           <div>
             <p className="mb-2 text-sm font-medium">Disciplinas</p>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               {DISCIPLINES.map((d) => (
                 <label className="flex items-center gap-2 text-sm" key={d.id}>
                   <Checkbox
@@ -183,6 +341,7 @@ export default function AdminSpaces() {
                 </label>
               ))}
             </div>
+            {fieldError('disciplines')}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -190,11 +349,12 @@ export default function AdminSpaces() {
               <FieldLabel>Aforo máximo</FieldLabel>
               <NumberField
                 aria-label="Aforo máximo"
+                max={500}
                 min={1}
-                max={50}
                 onValueChange={(v) => setForm((f) => ({ ...f, aforo: v ?? 1 }))}
                 value={form.aforo}
               />
+              {fieldError('capacity')}
             </Field>
             <Field>
               <FieldLabel>Estado</FieldLabel>
@@ -216,7 +376,7 @@ export default function AdminSpaces() {
               <Select
                 aria-label="Hora de apertura"
                 onValueChange={(v) => setForm((f) => ({ ...f, open: Number(v) }))}
-                options={HOURS.map((h) => ({ label: formatHour(h), value: String(h) }))}
+                options={OPEN_HOURS.map((h) => ({ label: formatHour(h), value: String(h) }))}
                 value={String(form.open)}
               />
             </Field>
@@ -225,11 +385,56 @@ export default function AdminSpaces() {
               <Select
                 aria-label="Hora de cierre"
                 onValueChange={(v) => setForm((f) => ({ ...f, close: Number(v) }))}
-                options={HOURS.map((h) => ({ label: formatHour(h), value: String(h) }))}
+                options={CLOSE_HOURS.map((h) => ({ label: formatHour(h), value: String(h) }))}
                 value={String(form.close)}
               />
+              {form.open >= form.close ? (
+                <p className="text-xs text-destructive-ink">Debe ser posterior a la apertura.</p>
+              ) : (
+                fieldError('closingTime')
+              )}
             </Field>
           </div>
+
+          <Field>
+            <FieldLabel>Requisitos de uso (opcional)</FieldLabel>
+            <Input
+              onValueChange={(v) => setForm((f) => ({ ...f, requirements: v }))}
+              placeholder="Calzado deportivo"
+              value={form.requirements}
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-[2fr_3fr]">
+            <ExistingImage id={form.id} kind="PREVIEW" version={imageVersion}>
+              {(current) => (
+                <ImagePicker
+                  current={current}
+                  file={images.PREVIEW}
+                  hint="Foto de la cancha"
+                  label="Vista previa"
+                  onChange={(f) => setImages((i) => ({ ...i, PREVIEW: f }))}
+                  required={!form.id}
+                />
+              )}
+            </ExistingImage>
+            <ExistingImage id={form.id} kind="PANORAMA" version={imageVersion}>
+              {(current) => (
+                <ImagePicker
+                  current={current}
+                  file={images.PANORAMA}
+                  hint="Panorámica 360° (equirectangular)"
+                  label="Panorámica 360°"
+                  onChange={(f) => setImages((i) => ({ ...i, PANORAMA: f }))}
+                  required={!form.id}
+                  wide
+                />
+              )}
+            </ExistingImage>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Máximo 30 MB por imagen. El servidor valida el formato por su contenido.
+          </p>
         </div>
       </Dialog>
     </div>

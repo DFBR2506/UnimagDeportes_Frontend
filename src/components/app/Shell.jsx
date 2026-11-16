@@ -3,52 +3,60 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   CalendarDays,
+  ChevronDown,
   ClipboardList,
   Gauge,
   Home,
   LogOut,
-  Mail,
   Menu,
-  QrCode,
   ScrollText,
   ShieldCheck,
   SquareStack,
   TimerOff,
   UserRound,
 } from 'lucide-react'
-import Sidebar, {
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from '@/components/smoothui/sidebar'
+import { SidebarMenuButton, SidebarProvider } from '@/components/smoothui/sidebar'
 import Drawer from '@/components/smoothui/drawer'
+import DropdownMenu from '@/components/smoothui/dropdown-menu'
+import Avatar from '@/components/smoothui/avatar'
+import ContactFab from '@/components/app/ContactDialog'
 import Toaster from '@/components/smoothui/toast'
+import Spinner from '@/components/smoothui/spinner'
 import SmoothButton from '@/components/smoothui/smooth-button'
 import Logo from '@/components/app/Logo'
 import { pageVariants } from '@/lib/anim'
 import { useApp } from '@/store'
 import { cn } from '@/lib/utils'
 
+// Mi cuota y Reglas de uso viven dentro de Mis reservas; el contacto es un botón flotante.
 export const STUDENT_NAV = [
   { to: '/app/inicio', label: 'Inicio', icon: Home },
   { to: '/app/disponibilidad', label: 'Disponibilidad', icon: CalendarDays },
   { to: '/app/mis-reservas', label: 'Mis reservas', icon: ClipboardList },
-  { to: '/app/mi-cuota', label: 'Mi cuota', icon: Gauge },
-  { to: '/app/reglas', label: 'Reglas de uso', icon: ScrollText },
-  { to: '/app/contacto', label: 'Contactar administrador', icon: Mail },
 ]
 
 export const ADMIN_NAV = [
-  { to: '/admin', label: 'Panel de ocupación', icon: Gauge },
-  { to: '/admin/espacios', label: 'Espacios y franjas', icon: SquareStack },
+  { to: '/admin', label: 'Panel de ocupación', icon: Gauge, exact: true },
+  { to: '/admin/espacios', label: 'Espacios', icon: SquareStack },
   { to: '/admin/bloqueos', label: 'Bloquear franjas', icon: TimerOff },
   { to: '/admin/reglas', label: 'Reglas de uso', icon: ScrollText },
-  { to: '/admin/qr', label: 'Generar QR', icon: QrCode },
 ]
+
+const VARIANTS = {
+  student: {
+    nav: STUDENT_NAV,
+    home: '/app/inicio',
+    navClass: 'md:flex',
+    burgerClass: 'md:hidden',
+  },
+  admin: {
+    nav: ADMIN_NAV,
+    home: '/admin',
+    // cuatro secciones + distintivo ADMIN no caben en md
+    navClass: 'lg:flex',
+    burgerClass: 'lg:hidden',
+  },
+}
 
 const navButtonClass = (active) =>
   cn(
@@ -56,36 +64,59 @@ const navButtonClass = (active) =>
     active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
   )
 
-function NavList({ items, onNavigate }) {
+const isActive = (pathname, { to, exact }) =>
+  exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`)
+
+/** Las subsecciones con barra flotante comparten layout: no animar toda la página entre ellas. */
+const transitionKey = (pathname) => {
+  if (/^\/app\/mis-reservas(\/(cuota|reglas))?$/.test(pathname)) return '/app/mis-reservas'
+  if (/^\/admin\/espacios(\/(qr|implementos))?$/.test(pathname)) return '/admin/espacios'
+  return pathname
+}
+
+function TopNav({ items, className }) {
   const location = useLocation()
   const navigate = useNavigate()
   return (
-    <SidebarMenu>
-      {items.map(({ to, label, icon: Icon }) => {
-        const active =
-          to === '/admin' ? location.pathname === '/admin' : location.pathname.startsWith(to)
+    <nav aria-label="Principal" className={cn('hidden h-full items-center gap-1', className)}>
+      {items.map((item) => {
+        const { to, label, icon: Icon } = item
+        const active = isActive(location.pathname, item)
         return (
-          <SidebarMenuItem key={to}>
-            <SidebarMenuButton
-              active={active}
-              className={navButtonClass(active)}
-              icon={<Icon />}
-              onClick={() => {
-                navigate(to)
-                onNavigate?.()
-              }}
-            >
-              {label}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <button
+            key={to}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'relative flex h-full cursor-pointer items-center gap-2 px-3 text-sm font-medium whitespace-nowrap transition-colors duration-300 focus-ring xl:px-4',
+              active ? 'text-white' : 'text-sidebar-foreground/70 hover:text-white'
+            )}
+            onClick={() => navigate(to)}
+            type="button"
+          >
+            <Icon className="size-4" />
+            {label}
+            {active && (
+              <motion.span
+                className="absolute inset-x-3 bottom-0 h-[3px] rounded-t-full bg-sidebar-primary"
+                layoutId="topnav-indicator"
+                transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+              />
+            )}
+          </button>
         )
       })}
-    </SidebarMenu>
+    </nav>
   )
 }
 
-function MobileNav({ items, footer }) {
+function MobileTopNav({ items, extra, className }) {
   const [open, setOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const go = (fn) => {
+    fn()
+    setOpen(false)
+  }
   return (
     <Drawer
       open={open}
@@ -96,7 +127,7 @@ function MobileNav({ items, footer }) {
       trigger={
         <SmoothButton
           aria-label="Abrir menú"
-          className="md:hidden"
+          className={cn('text-white hover:bg-white/10', className)}
           size="icon-sm"
           variant="ghost"
         >
@@ -104,107 +135,158 @@ function MobileNav({ items, footer }) {
         </SmoothButton>
       }
     >
-      <div className="flex min-h-[60vh] flex-col gap-2 pb-4">
-        <NavList items={items} onNavigate={() => setOpen(false)} />
-        <div className="mt-auto">{footer}</div>
+      <div className="flex min-h-[60vh] flex-col gap-1 pb-4">
+        {items.map((item) => {
+          const { to, label, icon: Icon } = item
+          const active = isActive(location.pathname, item)
+          return (
+            <SidebarMenuButton
+              key={to}
+              active={active}
+              className={navButtonClass(active)}
+              icon={<Icon />}
+              onClick={() => go(() => navigate(to))}
+            >
+              {label}
+            </SidebarMenuButton>
+          )
+        })}
+        <div className="mt-auto flex flex-col gap-1">
+          {extra.map(({ key, label, icon, onSelect }) => (
+            <SidebarMenuButton
+              key={key}
+              className={navButtonClass(false)}
+              icon={icon}
+              onClick={() => go(onSelect)}
+            >
+              {label}
+            </SidebarMenuButton>
+          ))}
+        </div>
       </div>
     </Drawer>
   )
 }
 
 /**
- * Estructura común (RNF-02 móvil primero): barra superior en móvil,
- * barra lateral azul institucional en escritorio.
+ * Estructura común (RNF-02 móvil primero): topbar azul institucional para
+ * estudiantes y administradores; en pantallas pequeñas la navegación va en un drawer.
  */
 export default function Shell({ variant = 'student' }) {
-  const { session, logout, isAdmin } = useApp()
+  const { token, session, logout, isAdmin, sessionNotice } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
 
+  // Sin token: al acceso, recordando el destino (RN-34, RN-56: tras vencer, se vuelve a la pantalla de origen).
+  if (!token) {
+    return (
+      <Navigate
+        to={sessionNotice === 'expired' ? '/acceso' : '/bienvenida'}
+        replace
+        state={{ from: location.pathname }}
+      />
+    )
+  }
+  // Token guardado pero aún sin GET /me.
   if (!session) {
-    return <Navigate to="/bienvenida" replace state={{ from: location.pathname }} />
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <Spinner aria-label="Cargando tu sesión" className="text-accent-ink" size="lg" />
+      </div>
+    )
   }
-  if (!session.name) {
-    return <Navigate to="/acceso/nombre" replace />
+  if (session.needsName) {
+    return <Navigate to="/acceso/nombre" replace state={{ from: location.pathname }} />
   }
-  // RN-60: el rol de administrador se asigna a correos específicos.
+  // RN-60: el rol lo asigna el backend (APP_AUTH_ADMIN_EMAILS).
   if (variant === 'admin' && !isAdmin) {
     return <Navigate to="/app/inicio" replace />
   }
 
-  const items = variant === 'admin' ? ADMIN_NAV : STUDENT_NAV
+  const config = VARIANTS[variant]
 
-  const footer = (
-    <div className="flex flex-col gap-1">
-      {variant === 'student' && isAdmin && (
-        <SidebarMenuButton
-          className={navButtonClass(false)}
-          icon={<ShieldCheck />}
-          onClick={() => navigate('/admin')}
-        >
-          Modo administrador
-        </SidebarMenuButton>
-      )}
-      {variant === 'admin' && (
-        <SidebarMenuButton
-          className={navButtonClass(false)}
-          icon={<UserRound />}
-          onClick={() => navigate('/app/inicio')}
-        >
-          Ver como estudiante
-        </SidebarMenuButton>
-      )}
-      <SidebarMenuButton
-        className={navButtonClass(false)}
-        icon={<LogOut />}
-        onClick={() => {
-          logout()
-          navigate('/bienvenida')
-        }}
-      >
-        Cerrar sesión
-      </SidebarMenuButton>
-      <p className="truncate px-2.5 pt-2 text-xs text-sidebar-foreground/50">
-        {variant === 'admin' ? 'Administrador' : session.email}
-      </p>
-    </div>
-  )
+  const onLogout = async () => {
+    await logout()
+    navigate('/bienvenida')
+  }
+
+  const initials = session.name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('')
+
+  // acciones de cuenta: cambio de rol + cerrar sesión
+  const accountActions = [
+    ...(variant === 'student' && isAdmin
+      ? [{ key: 'admin', label: 'Modo administrador', icon: <ShieldCheck className="size-4" />, onSelect: () => navigate('/admin') }]
+      : []),
+    ...(variant === 'admin'
+      ? [{ key: 'student', label: 'Ver como estudiante', icon: <UserRound className="size-4" />, onSelect: () => navigate('/app/inicio') }]
+      : []),
+    { key: 'logout', label: 'Cerrar sesión', icon: <LogOut className="size-4" />, onSelect: onLogout },
+  ]
+
+  const userMenu = [
+    { key: 'email', groupLabel: variant === 'admin' ? `Administrador · ${session.email}` : session.email },
+    { key: 'sep', separator: true },
+    ...accountActions.map((a) => (a.key === 'logout' ? { ...a, variant: 'destructive' } : a)),
+  ]
 
   return (
     <SidebarProvider>
-      <div className="flex h-dvh overflow-hidden bg-background">
-        <Sidebar className="hidden border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
-          <SidebarHeader className="h-16 px-4">
-            <Logo className="text-base text-sidebar-foreground" />
-          </SidebarHeader>
-          <SidebarContent className="px-2 pt-4">
-            <NavList items={items} />
-          </SidebarContent>
-          <SidebarFooter className="border-sidebar-border px-2 pb-4">{footer}</SidebarFooter>
-        </Sidebar>
+      <div className="min-h-dvh bg-background">
+        <header className="sticky top-0 z-40 bg-sidebar text-sidebar-foreground shadow-md shadow-sidebar/20 print:hidden">
+          <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 md:px-8">
+            <MobileTopNav className={config.burgerClass} extra={accountActions} items={config.nav} />
+            <button className="cursor-pointer rounded-md focus-ring" onClick={() => navigate(config.home)} type="button">
+              <Logo className="text-base text-white" />
+            </button>
+            {variant === 'admin' && (
+              <span className="hidden rounded-full bg-sidebar-primary/20 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-sidebar-primary uppercase sm:inline">
+                Admin
+              </span>
+            )}
+            <div className="ml-4 hidden h-full sm:block xl:ml-6">
+              <TopNav className={config.navClass} items={config.nav} />
+            </div>
+            <div className="ml-auto">
+              <DropdownMenu align="end" items={userMenu}>
+                <button
+                  className="flex cursor-pointer items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors hover:bg-white/10 focus-ring"
+                  type="button"
+                >
+                  <Avatar
+                    alt={session.name}
+                    className="rounded-full bg-sidebar-primary font-semibold text-sidebar-primary-foreground [&_*]:rounded-full [&_*]:bg-transparent [&_*]:text-sidebar-primary-foreground"
+                    fallback={initials}
+                    size="sm"
+                  />
+                  <span className="hidden max-w-40 truncate text-sm font-medium xl:block">{session.name}</span>
+                  <ChevronDown className="size-4 opacity-70" />
+                </button>
+              </DropdownMenu>
+            </div>
+          </div>
+        </header>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 bg-card/60 px-4 backdrop-blur md:hidden">
-            <MobileNav items={items} footer={footer} />
-            <Logo className="text-sm text-foreground [&>span:last-child]:text-amber-ink" />
-          </header>
-
-          <main className="min-h-0 flex-1 overflow-y-auto">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.pathname}
-                className="mx-auto w-full max-w-5xl px-4 py-8 md:px-10 md:py-12"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
-          </main>
-        </div>
+        <main>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={transitionKey(location.pathname)}
+              className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
+      {variant === 'student' && <ContactFab />}
       <Toaster />
     </SidebarProvider>
   )

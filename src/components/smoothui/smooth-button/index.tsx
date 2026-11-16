@@ -69,7 +69,7 @@ const smoothButtonVariants = cva(
       },
       variant: {
         candy:
-          "border-[0.5px] border-on-brand/25 bg-gradient-to-b from-[var(--btn,var(--color-brand))] to-[var(--btn-hover,var(--color-brand-secondary))] text-[var(--btn-fg,var(--color-on-brand))] text-shadow-sm shadow-black/20 shadow-md ring-1 ring-[color-mix(in_oklab,var(--color-foreground)_15%,var(--btn,var(--color-brand)))] hover:from-[var(--btn-hover,var(--color-brand-secondary))] hover:to-[var(--btn-hover,var(--color-brand-secondary))] [&_svg]:drop-shadow-sm",
+          "border-[0.5px] border-on-brand/25 bg-gradient-to-b from-[var(--btn,var(--color-brand))] to-[var(--btn-hover,var(--color-brand-secondary))] text-[var(--btn-fg,var(--color-on-brand))] text-shadow-sm shadow-black/20 shadow-md ring-1 ring-[color-mix(in_oklab,var(--color-foreground)_15%,var(--btn,var(--color-brand)))] hover:from-[var(--btn-hover,var(--color-brand-secondary))] hover:to-[var(--btn-hover,var(--color-brand-secondary))] [&_svg]:drop-shadow-sm disabled:bg-none disabled:bg-[color-mix(in_oklab,var(--btn,var(--color-brand))_14%,var(--color-card))] disabled:text-[var(--btn-text,var(--color-brand-ink))] disabled:text-shadow-none disabled:border-[color-mix(in_oklab,var(--btn,var(--color-brand))_45%,transparent)] disabled:ring-0 disabled:[&_svg]:drop-shadow-none",
         // --- legacy (preserved verbatim, ignore `color`) ---
         default:
           "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
