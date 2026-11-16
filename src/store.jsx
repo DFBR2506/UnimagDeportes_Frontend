@@ -1,192 +1,259 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { api, getToken, onSessionProblem, setToken } from '@/lib/api'
+import ReauthDialog from '@/components/app/ReauthDialog'
 import {
+  DEFAULT_SETTINGS,
   DISCIPLINES,
-  INITIAL_SETTINGS,
-  INITIAL_SPACES,
-  mondayOf,
-  addDays,
-  seedReservations,
-  seededState,
-  todayISO,
-} from '@/data/mock'
+  mapQuota,
+  mapReservation,
+  mapRules,
+  mapSlot,
+  mapSpace,
+  toInstant,
+} from '@/data/domain'
 
 const AppContext = createContext(null)
 
-const load = (key, fallback) => {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-const usePersisted = (key, initial) => {
-  const [value, setValue] = useState(() => load(key, initial))
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value))
-    } catch {
-      // almacenamiento no disponible: el prototipo sigue en memoria
-    }
-  }, [key, value])
-  return [value, setValue]
-}
-
-let idSeq = 0
-const newId = () => `res-${Date.now()}-${idSeq++}`
-
+/**
+ * Estado compartido de la sesión contra la API real:
+ * token (RN-55) + usuario de GET /me (RN-58), reglas vigentes, espacios activos,
+ * reservas propias y cuota. Las pantallas piden el resto bajo demanda.
+ */
 export function AppProvider({ children }) {
-  const [session, setSession] = usePersisted('ud-session', null)
-  const [reservations, setReservations] = usePersisted('ud-reservas', seedReservations())
-  const [settings, setSettings] = usePersisted('ud-reglas', INITIAL_SETTINGS)
-  const [spaces, setSpaces] = usePersisted('ud-espacios', INITIAL_SPACES)
-  const [blocks, setBlocks] = usePersisted('ud-bloqueos', [])
+  const [token, setTokenState] = useState(getToken)
+  const [me, setMe] = useState(null)
+  const [sessionNotice, setSessionNotice] = useState(null) // 'expired' tras un 401
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [spaces, setSpaces] = useState([])
+  const [spacesLoaded, setSpacesLoaded] = useState(false)
+  const [reservations, setReservations] = useState([])
+  const [quota, setQuota] = useState(null)
   const [draft, setDraft] = useState(null)
+  const [reauth, setReauth] = useState(null) // { resolve, reject } mientras se pide el código
+
+  const clearSession = useCallback(() => {
+    setToken(null)
+    setTokenState(null)
+    setMe(null)
+    setReservations([])
+    setQuota(null)
+    setSpaces([])
+    setSpacesLoaded(false)
+    setDraft(null)
+  }, [])
+
+  // 401 en cualquier petición → la sesión venció (RN-56); PROFILE_INCOMPLETE → pedir nombre (RN-59).
+  useEffect(
+    () =>
+      onSessionProblem((error) => {
+        if (error.status === 401) {
+          clearSession()
+          setSessionNotice('expired')
+        } else if (error.code === 'PROFILE_INCOMPLETE') {
+          setMe((m) => (m ? { ...m, needsName: true } : m))
+        }
+      }),
+    [clearSession]
+  )
+
+  // Restaurar la sesión guardada.
+  useEffect(() => {
+    if (!token || me) return
+    let alive = true
+    api('/me')
+      .then((user) => alive && setMe(user))
+      .catch(() => alive && clearSession())
+    return () => {
+      alive = false
+    }
+  }, [token, me, clearSession])
+
+  const refreshReservations = useCallback(async () => {
+    const res = await api('/reservations/mine')
+    const list = res.reservations.map(mapReservation)
+    setReservations(list)
+    return list
+  }, [])
+
+  const refreshQuota = useCallback(async () => {
+    const q = mapQuota(await api('/quota/me'))
+    setQuota(q)
+    return q
+  }, [])
+
+  const refreshSpaces = useCallback(async () => {
+    const res = await api('/spaces')
+    const list = res.spaces.map(mapSpace).sort((a, b) => a.name.localeCompare(b.name, 'es'))
+    setSpaces(list)
+    setSpacesLoaded(true)
+    return list
+  }, [])
+
+  const refreshRules = useCallback(async () => {
+    const r = mapRules(await api('/rules'))
+    setSettings(r)
+    return r
+  }, [])
+
+  // Datos base una vez que el perfil está completo.
+  const ready = Boolean(me && !me.needsName)
+  useEffect(() => {
+    if (!ready) return
+    refreshRules().catch(() => {})
+    refreshSpaces().catch(() => setSpacesLoaded(true))
+    refreshReservations().catch(() => {})
+    refreshQuota().catch(() => {})
+  }, [ready, refreshRules, refreshSpaces, refreshReservations, refreshQuota])
+
+  // ---------------------------------------------------------------- acceso (UC01)
+
+  const startSession = async (newToken) => {
+    setToken(newToken)
+    setTokenState(newToken)
+    setSessionNotice(null)
+    const user = await api('/me')
+    setMe(user)
+    return user
+  }
+
+  const requestCode = (email) => api('/auth/code', { method: 'POST', body: { email }, auth: false })
+
+  const verifyCode = async (email, code) => {
+    const res = await api('/auth/verify', { method: 'POST', body: { email, code }, auth: false })
+    return startSession(res.token)
+  }
+
+  /** Acceso de demostración: solo existe con el perfil `dev` del backend. */
+  const devLogin = async (email, name) => {
+    const res = await api('/dev/login', { method: 'POST', body: { email, name }, auth: false })
+    return startSession(res.token)
+  }
+
+  const completeProfile = async (name) => {
+    const user = await api('/me/profile', { method: 'PUT', body: { name } })
+    setMe(user)
+    return user
+  }
+
+  const logout = async () => {
+    try {
+      await api('/auth/logout', { method: 'POST' }) // RN-61: solo auditoría
+    } catch {
+      // el token se elimina igual
+    }
+    clearSession()
+  }
+
+  // ------------------------------------------------- reautenticación (D-21)
+
+  /** Ejecuta `fn`; si la API exige reautenticación, pide el código y reintenta una vez. */
+  const withReauth = async (fn) => {
+    try {
+      return await fn()
+    } catch (err) {
+      if (err?.code !== 'REAUTH_REQUIRED') throw err
+      await new Promise((resolve, reject) => setReauth({ resolve, reject }))
+      return fn()
+    }
+  }
+
+  const onReauthenticated = (newToken) => {
+    setToken(newToken)
+    setTokenState(newToken)
+    reauth?.resolve()
+    setReauth(null)
+  }
+
+  const onReauthCancel = () => {
+    const err = new Error('Reautenticación cancelada')
+    err.code = 'REAUTH_CANCELLED'
+    reauth?.reject(err)
+    setReauth(null)
+  }
+
+  // ---------------------------------------------------------------- consultas
 
   const spaceById = (id) => spaces.find((s) => s.id === id)
   const disciplineById = (id) => DISCIPLINES.find((d) => d.id === id)
 
-  /** Franjas de un espacio en una fecha, combinando semilla, bloqueos y reservas propias. */
-  const slotsFor = (spaceId, iso) => {
-    const space = spaceById(spaceId)
-    if (!space) return []
-    const slots = []
-    for (let h = space.open; h < space.close; h++) {
-      const block = blocks.find(
-        (b) => b.spaceId === spaceId && b.date === iso && h >= b.startHour && h < b.endHour
-      )
-      const mine = reservations.find(
+  /** Franjas de un día (UC02), marcando las que son reservas propias. */
+  const fetchAvailability = async (spaceId, date, discipline, signal) => {
+    const res = await api(`/spaces/${spaceId}/availability`, { query: { date, discipline }, signal })
+    return res.slots.map(mapSlot).map((slot) => {
+      if (slot.estado !== 'ocupada') return slot
+      const mine = reservations.some(
         (r) =>
           r.spaceId === spaceId &&
-          r.date === iso &&
+          r.date === date &&
           ['confirmada', 'en-uso'].includes(r.estado) &&
-          h >= r.startHour &&
-          h < r.startHour + r.hours
+          slot.hour >= r.startHour &&
+          slot.hour < r.startHour + r.hours
       )
-      if (block) {
-        slots.push({ hour: h, estado: 'bloqueada', motivo: block.motivo })
-      } else if (mine) {
-        slots.push({ hour: h, estado: 'mia' })
-      } else {
-        slots.push({ hour: h, ...seededState(spaceId, iso, h) })
-      }
-    }
-    return slots
-  }
-
-  /** Horas que cuentan contra la cuota en la semana de `iso` (RN-16/17 + tabla 5.4). */
-  const quotaUsed = (iso = todayISO()) => {
-    const monday = mondayOf(iso)
-    const sunday = addDays(monday, 6)
-    return reservations
-      .filter((r) => r.date >= monday && r.date <= sunday)
-      .filter((r) =>
-        ['confirmada', 'en-uso', 'completada', 'cancelada-tardia', 'inasistencia'].includes(r.estado)
-      )
-      .reduce((acc, r) => acc + r.hours, 0)
-  }
-
-  const quota = {
-    max: settings.cuotaSemanalHoras,
-    used: quotaUsed(),
-    get left() {
-      return Math.max(0, this.max - this.used)
-    },
-  }
-
-  const addReservation = ({ spaceId, disciplineId, date, startHour, hours }) => {
-    const res = {
-      id: newId(),
-      spaceId,
-      disciplineId,
-      date,
-      startHour,
-      hours,
-      estado: 'confirmada',
-      nombre: session?.name ?? null,
-    }
-    setReservations((prev) => [res, ...prev])
-    return res
-  }
-
-  /** ¿Una cancelación ahora sería tardía? (RN-21/22) */
-  const isLateCancel = (res) => {
-    const start = new Date(`${res.date}T${String(res.startHour).padStart(2, '0')}:00:00`)
-    return start.getTime() - Date.now() < settings.cancelacionTardiaMin * 60 * 1000
-  }
-
-  const cancelReservation = (id) => {
-    const res = reservations.find((r) => r.id === id)
-    if (!res) return null
-    const estado = isLateCancel(res) ? 'cancelada-tardia' : 'cancelada-tiempo'
-    setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, estado } : r)))
-    return estado
-  }
-
-  const checkInReservation = (id) => {
-    setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, estado: 'en-uso' } : r)))
-  }
-
-  const addBlock = (block) => {
-    setBlocks((prev) => [{ ...block, id: newId() }, ...prev])
-    // RN-43: reservas afectadas se cancelan por administrador y no cuentan cuota.
-    let affected = 0
-    setReservations((prev) =>
-      prev.map((r) => {
-        const hit =
-          r.spaceId === block.spaceId &&
-          r.date === block.date &&
-          ['confirmada', 'en-uso'].includes(r.estado) &&
-          r.startHour < block.endHour &&
-          r.startHour + r.hours > block.startHour
-        if (hit) affected++
-        return hit ? { ...r, estado: 'cancelada-admin' } : r
-      })
-    )
-    return affected
-  }
-
-  const saveSpace = (space) => {
-    setSpaces((prev) => {
-      const exists = prev.some((s) => s.id === space.id)
-      return exists ? prev.map((s) => (s.id === space.id ? space : s)) : [...prev, space]
+      return mine ? { ...slot, estado: 'mia' } : slot
     })
   }
 
-  const login = (email) => setSession({ email, name: null })
-  const setName = (name) => setSession((s) => ({ ...s, name }))
-  const logout = () => {
-    setSession(null)
-    setDraft(null)
+  const createReservation = async ({ spaceId, date, startHour, hours, equipment = [] }) => {
+    const res = await api('/reservations', {
+      method: 'POST',
+      body: {
+        spaceId,
+        startAt: toInstant(date, startHour),
+        slots: hours,
+        ...(equipment.length ? { equipment } : {}),
+      },
+    })
+    const created = mapReservation(res)
+    setReservations((prev) => [created, ...prev.filter((r) => r.id !== created.id)])
+    refreshQuota().catch(() => {})
+    return created
   }
 
+  const isAdmin = me?.role === 'ADMIN'
+
   const value = {
-    session,
-    login,
-    setName,
+    // sesión
+    token,
+    me,
+    session: me,
+    isAdmin,
+    sessionNotice,
+    setSessionNotice,
+    requestCode,
+    verifyCode,
+    devLogin,
+    completeProfile,
     logout,
-    isAdmin: Boolean(session?.email?.toLowerCase().startsWith('admin')),
-    reservations,
-    addReservation,
-    cancelReservation,
-    checkInReservation,
-    isLateCancel,
-    quota,
+    withReauth,
+    // datos
     settings,
-    setSettings,
+    refreshRules,
     spaces,
-    saveSpace,
+    spacesLoaded,
+    refreshSpaces,
     spaceById,
     disciplineById,
-    blocks,
-    addBlock,
-    slotsFor,
+    reservations,
+    refreshReservations,
+    quota,
+    refreshQuota,
+    fetchAvailability,
+    createReservation,
     draft,
     setDraft,
   }
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      <ReauthDialog
+        email={me?.email}
+        onCancel={onReauthCancel}
+        onSuccess={onReauthenticated}
+        open={Boolean(reauth)}
+      />
+    </AppContext.Provider>
+  )
 }
 
 export const useApp = () => {

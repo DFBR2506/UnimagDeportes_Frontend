@@ -1,30 +1,30 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
-import { CalendarDays, Check, FileText } from 'lucide-react'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { CalendarDays, Check, Dumbbell, FileText } from 'lucide-react'
 import SmoothButton from '@/components/smoothui/smooth-button'
 import Badge from '@/components/smoothui/badge'
 import PageHeader from '@/components/app/PageHeader'
 import { EASE, springSlow, staggerChild, staggerParent } from '@/lib/anim'
-import { formatDate, formatRange } from '@/data/mock'
+import { formatDate, formatRange } from '@/data/domain'
 import { useApp } from '@/store'
 
 export default function ReservationConfirmed() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
-  const { reservations, session, spaceById, disciplineById } = useApp()
+  const { reservations, session, disciplineById } = useApp()
+  // La reserva llega en el estado de navegación tras POST /reservations; si no, se busca en Mis reservas.
+  const [res] = useState(
+    () => location.state?.reservation ?? reservations.find((r) => r.id === id) ?? null
+  )
+  const discipline = disciplineById(location.state?.discipline)
 
-  const res = reservations.find((r) => r.id === id)
   if (!res) return <Navigate to="/app/mis-reservas" replace />
-
-  const space = spaceById(res.spaceId)
-  const discipline = disciplineById(res.disciplineId)
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Reserva confirmada"
-        subtitle="Tu espacio quedó reservado de inmediato."
-      />
+      <PageHeader title="Reserva confirmada" subtitle="Tu espacio quedó reservado de inmediato." />
 
       <motion.section
         className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs"
@@ -32,7 +32,7 @@ export default function ReservationConfirmed() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 1, ease: EASE, delay: 0.2 }}
       >
-        <div className="h-1.5 bg-gradient-to-r from-accent via-sidebar-primary to-destructive" />
+        <div className="h-1.5 bg-gradient-to-r from-sidebar via-accent to-sidebar" />
         <motion.div className="space-y-5 p-7 md:p-9" {...staggerParent}>
           <motion.div className="flex items-center gap-3" {...staggerChild}>
             <motion.span
@@ -47,20 +47,32 @@ export default function ReservationConfirmed() {
           </motion.div>
 
           <motion.div className="space-y-1.5" {...staggerChild}>
-            <h2 className="font-display text-3xl font-bold text-card-foreground">{space?.name}</h2>
+            <h2 className="font-display text-3xl font-bold text-card-foreground">{res.spaceName}</h2>
             <p className="text-muted-foreground">
-              {discipline?.name} · {formatDate(res.date)} · {formatRange(res.startHour, res.hours)}
+              {discipline ? `${discipline.name} · ` : ''}
+              {formatDate(res.date)} · {formatRange(res.startHour, res.hours)}
             </p>
             <p className="font-medium text-card-foreground">{session.name}</p>
           </motion.div>
+
+          {res.equipment.length > 0 && (
+            <motion.ul className="space-y-1.5 text-sm" {...staggerChild}>
+              {res.equipment.map((e) => (
+                <li key={e.equipmentId} className="flex items-center gap-2 text-card-foreground">
+                  <Dumbbell className="size-4 text-accent-ink" />
+                  {e.quantity} × {e.name}
+                </li>
+              ))}
+            </motion.ul>
+          )}
 
           <motion.div
             className="space-y-2 border-t border-border pt-5 text-sm text-muted-foreground"
             {...staggerChild}
           >
             <p className="flex items-center gap-2">
-              <FileText className="size-4 shrink-0 text-accent" />
-              Se enviará un comprobante PDF a tu correo institucional.
+              <FileText className="size-4 shrink-0 text-accent-ink" />
+              Te enviamos el comprobante PDF a tu correo institucional.
             </p>
             <p>La reserva es nominal y no transferible.</p>
           </motion.div>

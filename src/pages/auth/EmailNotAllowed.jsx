@@ -13,7 +13,7 @@ export default function EmailNotAllowed() {
   return (
     <motion.div className="space-y-8" {...staggerParent}>
       <motion.div className="space-y-3" {...staggerChild}>
-        <h1 className="font-display text-4xl font-bold tracking-tight text-foreground">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
           Correo no permitido
         </h1>
         <p className="text-muted-foreground">No pudimos solicitar el código.</p>
