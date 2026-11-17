@@ -65,7 +65,7 @@ const parseError = async (res) => {
  */
 export async function api(path, { method = 'GET', body, form, query, as = 'json', auth = true, signal } = {}) {
   // Recorrido MVP: la sesión de demostración se atiende en el navegador, sin backend.
-  if (isDemoToken(token)) return mockRequest(token, path, { method, body, form, query, as })
+  if (isDemoToken(token)) return mockRequest(token, path, { method, body, form, query, as, signal })
 
   const headers = {}
   if (auth && token) headers.Authorization = `Bearer ${token}`

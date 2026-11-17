@@ -5,6 +5,7 @@
 // por (espacio, fecha, hora), como en el prototipo original.
 
 import { ApiError } from '@/lib/apiError'
+import { DEMO_CATALOG_VERSION, DEMO_PANORAMAS, DEMO_SPACE_IDS as SPACE_IDS, migrateDemoCatalog } from '@/data/demoSpaces'
 import {
   addDays,
   bogotaParts,
@@ -31,14 +32,6 @@ const USERS = {
   admin: { id: 'demo-admin', email: 'admin.deportes@unimagdalena.edu.co', name: 'Equipo de Deportes', role: 'ADMIN' },
 }
 
-const SPACE_IDS = {
-  multiple: 'a1b2c3d4-0001-4000-8000-000000000001',
-  tennis1: 'a1b2c3d4-0002-4000-8000-000000000002',
-  tennis2: 'a1b2c3d4-0003-4000-8000-000000000003',
-  football5: 'a1b2c3d4-0004-4000-8000-000000000004',
-  football11: 'a1b2c3d4-0005-4000-8000-000000000005',
-}
-
 // ---------------------------------------------------------------------------
 // Estado
 // ---------------------------------------------------------------------------
@@ -57,15 +50,16 @@ const seedState = () => {
     userId: 'demo-student',
   })
   return {
+    catalogVersion: DEMO_CATALOG_VERSION,
     spaces: [
-      { id: SPACE_IDS.multiple, name: 'Cancha múltiple', capacity: 20, requirements: 'Calzado deportivo', openingTime: '08:00', closingTime: '20:00', status: 'ACTIVE', disciplines: ['BASKETBALL', 'VOLLEYBALL'] },
+      { id: SPACE_IDS.multiple1, name: 'Cancha múltiple 1', capacity: 20, requirements: 'Calzado deportivo', openingTime: '08:00', closingTime: '20:00', status: 'ACTIVE', disciplines: ['BASKETBALL', 'VOLLEYBALL'] },
       { id: SPACE_IDS.tennis1, name: 'Cancha de tenis 1', capacity: 4, requirements: 'Calzado deportivo', openingTime: '06:00', closingTime: '18:00', status: 'ACTIVE', disciplines: ['TENNIS'] },
-      { id: SPACE_IDS.tennis2, name: 'Cancha de tenis 2', capacity: 4, requirements: 'Calzado deportivo', openingTime: '06:00', closingTime: '18:00', status: 'ACTIVE', disciplines: ['TENNIS'] },
+      { id: SPACE_IDS.multiple2, name: 'Cancha múltiple 2', capacity: 20, requirements: 'Calzado deportivo', openingTime: '06:00', closingTime: '18:00', status: 'ACTIVE', disciplines: ['FOOTBALL_5', 'BASKETBALL'] },
       { id: SPACE_IDS.football5, name: 'Cancha fútbol 5', capacity: 10, requirements: '', openingTime: '07:00', closingTime: '21:00', status: 'MAINTENANCE', disciplines: ['FOOTBALL_5'] },
       { id: SPACE_IDS.football11, name: 'Cancha fútbol 11', capacity: 22, requirements: 'Guayos o tenis', openingTime: '07:00', closingTime: '21:00', status: 'ACTIVE', disciplines: ['FOOTBALL_11'] },
     ],
     reservations: [
-      res('res-seed-1', SPACE_IDS.multiple, today, 14, 'CONFIRMED', addDays(today, -1)),
+      res('res-seed-1', SPACE_IDS.multiple1, today, 14, 'CONFIRMED', addDays(today, -1)),
       res('res-seed-2', SPACE_IDS.tennis1, addDays(today, -3), 15, 'COMPLETED', addDays(today, -5)),
       res('res-seed-3', SPACE_IDS.football11, addDays(today, -8), 18, 'NO_SHOW', addDays(today, -10)),
     ],
@@ -91,7 +85,9 @@ const getState = () => {
   } catch {
     // almacenamiento no disponible: se usa memoria
   }
-  return (state ??= seedState())
+  if (!state) return (state = seedState())
+  if (migrateDemoCatalog(state)) save()
+  return state
 }
 const save = () => {
   try {
@@ -310,10 +306,31 @@ route('GET', '/spaces/:id/availability', ({ s, params, query }) => {
   return { spaceId: space.id, date, discipline: query.discipline ?? null, slots }
 })
 
-route('GET', '/spaces/:id/images/:kind', ({ params }) => {
+route('GET', '/spaces/:id/images/:kind', async ({ params, signal }) => {
   const blob = images.get(`${params.id}:${params.kind}`)
-  if (!blob) fail(404, 'IMAGE_NOT_AVAILABLE', 'La imagen no está disponible en el recorrido de demostración.')
-  return blob
+  if (blob) return blob
+
+  // PREVIEW mantiene su comportamiento original. Solo PANORAMA usa archivos locales.
+  const filename = params.kind === 'PANORAMA' ? DEMO_PANORAMAS[params.id] : null
+  if (!filename) fail(404, 'IMAGE_NOT_AVAILABLE', 'La imagen no está disponible en el recorrido de demostración.')
+
+  for (const extension of ['png', 'jpg', 'jpeg', 'webp']) {
+    signal?.throwIfAborted()
+    const candidate = filename.replace(/\.[^.]+$/, `.${extension}`)
+    let response
+    try {
+      response = await fetch(`${import.meta.env.BASE_URL}panoramas/${candidate}`, { signal, cache: 'no-cache' })
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      fail(0, 'NETWORK_ERROR', 'No se pudo descargar el panorama de demostración. Intenta de nuevo.')
+    }
+
+    // Solo busca otra extensión si falta el archivo, incluido el HTML de respaldo de Vite.
+    if (response.status === 404 || (response.ok && response.headers.get('Content-Type')?.includes('text/html'))) continue
+    if (!response.ok) fail(response.status, 'PANORAMA_LOAD_FAILED', 'No se pudo descargar el panorama de demostración.')
+    return response.blob()
+  }
+  fail(404, 'IMAGE_NOT_AVAILABLE', `Añade ${filename} (o el mismo nombre con .jpg, .jpeg o .webp) en public/panoramas/ y vuelve a intentar.`)
 })
 
 route('GET', '/quota/me', ({ s, user }) => {
@@ -722,8 +739,10 @@ route('POST', '/admin/blocks', ({ s, body }) => {
 // Entrada
 // ---------------------------------------------------------------------------
 
-export async function mockRequest(token, path, { method = 'GET', body, form, query = {}, as = 'json' } = {}) {
+export async function mockRequest(token, path, { method = 'GET', body, form, query = {}, as = 'json', signal } = {}) {
+  signal?.throwIfAborted()
   await sleep(120 + Math.random() * 180)
+  signal?.throwIfAborted()
   const cleanQuery = Object.fromEntries(
     Object.entries(query).filter(([, v]) => v !== undefined && v !== null && v !== '')
   )
@@ -742,6 +761,7 @@ export async function mockRequest(token, path, { method = 'GET', body, form, que
       query: cleanQuery,
       body,
       form,
+      signal,
     })
     if (result instanceof Blob && as === 'text') return result.text()
     return result
