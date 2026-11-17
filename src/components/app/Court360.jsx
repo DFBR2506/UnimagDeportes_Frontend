@@ -30,69 +30,44 @@ export default function Court360({ kind = 'multiple', name, imageUrl, status = '
   useEffect(() => {
     if (!imageUrl || status !== 'ready') return
     let active = true
-    let viewer = null
-
-    const fail = (message) => {
-      if (active) setView({ url: imageUrl, status: 'error', message })
-    }
+    let session = null
 
     ;(async () => {
       try {
-        const [{ Viewer, Cache, SYSTEM }, { AutorotatePlugin }] = await Promise.all([
-          import('@photo-sphere-viewer/core'),
-          import('@photo-sphere-viewer/autorotate-plugin'),
-          import('@photo-sphere-viewer/core/index.css'),
-        ])
+        const { createPanoramaViewer } = await import('@/lib/panoramaViewer')
         if (!active) return
         setView({ url: imageUrl, status: 'loading', message: '' })
         setAuto(false)
         setHeading(0)
         setNotice('')
 
-        // Comprueba WebGL antes de que el constructor deje una instancia incompleta.
-        SYSTEM.load()
-        Cache.enabled = false // Los blobs autenticados solo deben vivir mientras se usan.
-
-        viewer = new Viewer({
+        session = createPanoramaViewer({
           container: boxRef.current,
-          navbar: false,
-          keyboard: false,
-          mousewheelCtrlKey: true,
-          touchmoveTwoFingers: true,
-          loadingTxt: 'Preparando vista 360°…',
-          lang: {
-            loadError: 'No se pudo mostrar el panorama.',
-            twoFingers: 'Usa dos dedos para mirar alrededor',
-            ctrlZoom: 'Usa Ctrl + rueda para acercar o alejar',
+          panorama: imageUrl,
+          autoRotate: !reduce,
+          onReady: () => {
+            if (active) setView({ url: imageUrl, status: 'ready', message: '' })
           },
-          plugins: [[AutorotatePlugin, {
-            autostartDelay: null,
-            autostartOnIdle: false,
-            autorotateSpeed: '1rpm',
-          }]],
+          onAutoRotate: (enabled) => { if (active) setAuto(enabled) },
+          onPositionChange: (position) => {
+            if (active) setHeading(Math.round(((position.yaw * 180 / Math.PI) % 360 + 360) % 360) % 360)
+          },
+          onError: (message) => {
+            if (!active) return
+            viewerRef.current = null
+            setView({ url: imageUrl, status: 'error', message })
+          },
         })
-        viewerRef.current = viewer
-        const autorotate = viewer.getPlugin(AutorotatePlugin)
-        autorotate.addEventListener('autorotate', (event) => active && setAuto(event.autorotateEnabled))
-        viewer.addEventListener('position-updated', (event) => {
-          if (active) setHeading(Math.round(((event.position.yaw * 180 / Math.PI) % 360 + 360) % 360) % 360)
-        })
-        viewer.addEventListener('ready', () => {
-          if (!active) return
-          setView({ url: imageUrl, status: 'ready', message: '' })
-          if (!reduce) autorotate.start()
-        }, { once: true })
-        viewer.addEventListener('panorama-error', () => fail('La imagen no se pudo mostrar en el visor. Vuelve a intentar.'))
-        await viewer.setPanorama(imageUrl)
+        viewerRef.current = session.viewer
       } catch {
-        fail('No se pudo iniciar la vista 360°. Comprueba que tu navegador permita WebGL y vuelve a intentar.')
+        if (active) setView({ url: imageUrl, status: 'error', message: 'No se pudo iniciar la vista 360°. Comprueba que tu navegador permita WebGL y vuelve a intentar.' })
       }
     })()
 
     return () => {
       active = false
       viewerRef.current = null
-      viewer?.destroy()
+      session?.destroy()
     }
   }, [imageUrl, status, reduce, attempt])
 
@@ -136,8 +111,7 @@ export default function Court360({ kind = 'multiple', name, imageUrl, status = '
       aria-label={`Panorama de ${name ?? 'la cancha'}`}
       aria-busy={loading}
       className={cn(
-        'relative isolate overflow-hidden rounded-2xl bg-sidebar shadow-lg ring-1 ring-sidebar/20 select-none focus-ring [&>.psv-container]:absolute [&>.psv-container]:inset-0',
-        viewerFailed && '[&>.psv-container]:invisible',
+        'relative isolate overflow-hidden rounded-2xl bg-sidebar shadow-lg ring-1 ring-sidebar/20 select-none focus-ring',
         className
       )}
       onKeyDown={(event) => {

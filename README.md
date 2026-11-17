@@ -80,6 +80,8 @@ bloqueos ni espacios personalizados.
   memoria de la textura. Los archivos ya 2:1 que caben en ese límite no se recodifican.
 - Las adaptaciones se generan como PNG en memoria para conservar transparencia y
   evitar pérdidas adicionales de compresión. También se aplican a imágenes del backend.
+- El visor ignora los metadatos XMP/GPano de recorte: la textura preparada siempre
+  representa la esfera completa, incluso si el archivo original ya tenía proporción 2:1.
 - No se admiten SVG, archivos dañados ni imágenes sin dimensiones válidas.
 - Cuanto más se aleje la proporción original de 2:1, mayor será la deformación.
   El ajuste no reconstruye partes que falten ni convierte una fotografía convencional
@@ -92,6 +94,9 @@ pausar el giro y abrir pantalla completa. En móvil se usan dos dedos; con rató
 Ctrl + rueda evita interferir con el desplazamiento de la página. La orientación
 mostrada es relativa, no el norte geográfico. El giro automático respeta movimiento
 reducido. Se requiere WebGL; si falla, permanece una ilustración 2D identificada.
+Si se pierde el contexto durante el uso, se retira el visor y aparece la alternativa
+2D con un botón para crear una instancia nueva. La restauración del contexto anterior
+no reactiva un visor cerrado.
 
 En **Administrador → Espacios → Ver 360°** se puede consultar cualquier panorama,
 incluido el de fútbol 5 en mantenimiento. En estudiante solo aparecen canchas activas.
@@ -101,6 +106,10 @@ sesión de la página. No escriben en `public/`: después de recargar se recuper
 archivos demo. Los espacios nuevos sin archivo asociado deben volver a cargar su
 imagen. El visor conserva únicamente el panorama en uso y libera descargas/URLs al
 cambiar de cancha o sesión y al desmontarse; no acumula panoramas en una caché global.
+Cada instancia posee un contenedor y un contexto independientes. Al cerrarla se
+cancelan descargas y callbacks, se descartan texturas tardías y se completa la
+destrucción cuando termina la carga pendiente, evitando reinicializar servicios ya
+destruidos. También se limpian las construcciones parciales si falla el constructor.
 
 ### Integración futura con backend
 

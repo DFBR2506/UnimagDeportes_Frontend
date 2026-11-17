@@ -1,49 +1,47 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ instances: [], reduce: false, noWebgl: false, imageError: false }))
 vi.mock('motion/react', () => ({ useReducedMotion: () => mocks.reduce }))
 vi.mock('@/components/app/CourtArt', () => ({ default: () => <svg data-testid="court-art" /> }))
 vi.mock('@/components/smoothui/spinner', () => ({ default: () => <span>Cargando panorama</span> }))
-vi.mock('@photo-sphere-viewer/autorotate-plugin', () => ({ AutorotatePlugin: class {} }))
-vi.mock('@photo-sphere-viewer/core', () => ({
-  Cache: { enabled: true },
-  SYSTEM: { load: () => { if (mocks.noWebgl) throw new Error('WebGL unsupported') } },
-  Viewer: class {
-    constructor(config) {
-      this.config = config
-      this.events = new Map()
-      this.position = { yaw: 0, pitch: 0 }
-      let enabled = false
-      const notify = () => this.onAutorotate?.({ autorotateEnabled: enabled })
-      this.autorotate = {
-        addEventListener: (_type, listener) => { this.onAutorotate = listener },
-        start: vi.fn(() => { enabled = true; notify() }),
-        stop: vi.fn(() => { enabled = false; notify() }),
-        toggle: vi.fn(() => { enabled = !enabled; notify() }),
-      }
-      this.setPanorama = vi.fn(async () => {
-        if (mocks.imageError) throw new Error('bad panorama')
-        this.events.get('ready')?.()
-        return true
-      })
-      this.destroy = vi.fn()
-      this.rotate = vi.fn((position) => {
-        this.position = position
-        this.events.get('position-updated')?.({ position })
-      })
-      this.zoomIn = vi.fn()
-      this.zoomOut = vi.fn()
-      mocks.instances.push(this)
+vi.mock('@/lib/panoramaViewer', () => ({
+  createPanoramaViewer: vi.fn((callbacks) => {
+    if (mocks.noWebgl) throw new Error('WebGL unsupported')
+    let closed = false
+    let enabled = false
+    let position = { yaw: 0, pitch: 0 }
+    const autorotate = {
+      start: vi.fn(() => { enabled = true; callbacks.onAutoRotate(enabled) }),
+      stop: vi.fn(() => { enabled = false; callbacks.onAutoRotate(enabled) }),
+      toggle: vi.fn(() => { enabled = !enabled; callbacks.onAutoRotate(enabled) }),
     }
-    addEventListener(type, listener) { this.events.set(type, listener) }
-    getPlugin() { return this.autorotate }
-    getPosition() { return this.position }
-  },
+    const viewer = {
+      callbacks,
+      autorotate,
+      destroy: vi.fn(() => { closed = true }),
+      getPlugin: () => autorotate,
+      getPosition: () => position,
+      rotate: vi.fn((next) => { position = next; callbacks.onPositionChange(position) }),
+      zoomIn: vi.fn(),
+      zoomOut: vi.fn(),
+    }
+    mocks.instances.push(viewer)
+    queueMicrotask(() => {
+      if (closed) return
+      if (mocks.imageError) callbacks.onError('La imagen no se pudo mostrar en el visor.')
+      else {
+        callbacks.onReady()
+        if (callbacks.autoRotate) autorotate.start()
+      }
+    })
+    return { viewer, destroy: viewer.destroy }
+  }),
 }))
 
 import Court360 from './Court360'
+import { createPanoramaViewer } from '@/lib/panoramaViewer'
 
 beforeEach(() => {
   mocks.instances.length = 0
@@ -81,9 +79,7 @@ describe('visor esférico', () => {
     render(<Court360 name="Cancha" imageUrl="blob:one" status="ready" />)
     await screen.findByRole('button', { name: 'Pausar giro' })
     const viewer = mocks.instances[0]
-    expect(viewer.setPanorama).toHaveBeenCalledWith('blob:one')
-    expect(viewer.config.mousewheelCtrlKey).toBe(true)
-    expect(viewer.config.touchmoveTwoFingers).toBe(true)
+    expect(createPanoramaViewer).toHaveBeenCalledWith(expect.objectContaining({ panorama: 'blob:one', autoRotate: true }))
     fireEvent.click(screen.getByRole('button', { name: 'Girar a la derecha' }))
     expect(viewer.rotate).toHaveBeenCalledWith({ yaw: Math.PI / 6, pitch: 0 })
     expect(screen.getByLabelText('Orientación relativa: 30 grados')).toBeTruthy()
@@ -152,6 +148,32 @@ describe('visor esférico', () => {
     await screen.findByText('No se pudo mostrar el panorama')
     expect(screen.getByRole('region').getAttribute('aria-busy')).toBe('false')
     expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy()
+  })
+
+  it('muestra alternativa 2D y permite reintentar tras un fallo de WebGL durante el uso', async () => {
+    const retry = vi.fn()
+    render(<Court360 imageUrl="blob:one" status="ready" onRetry={retry} />)
+    await screen.findByRole('button', { name: 'Pausar giro' })
+    const previous = mocks.instances[0]
+    act(() => previous.callbacks.onError('Se perdió el contexto WebGL.'))
+    expect(screen.getByText('Se perdió el contexto WebGL.')).toBeTruthy()
+    expect(screen.getByTestId('court-art')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a intentar' }))
+    await screen.findByRole('button', { name: 'Pausar giro' })
+    expect(retry).toHaveBeenCalledOnce()
+    expect(previous.destroy).toHaveBeenCalledOnce()
+    expect(mocks.instances).toHaveLength(2)
+  })
+
+  it('ignora los callbacks de un visor anterior después de cambiar de imagen', async () => {
+    const { rerender } = render(<Court360 imageUrl="blob:one" status="ready" />)
+    await screen.findByRole('button', { name: 'Pausar giro' })
+    const previous = mocks.instances[0]
+    rerender(<Court360 imageUrl="blob:two" status="ready" />)
+    await screen.findByRole('button', { name: 'Pausar giro' })
+    act(() => previous.callbacks.onError('Error de la carga antigua'))
+    expect(screen.queryByText('Error de la carga antigua')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pausar giro' })).toBeTruthy()
   })
 
   it('no mezcla los controles de dos visores montados', async () => {
