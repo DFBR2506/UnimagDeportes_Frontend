@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { ImageUp, MapPinned, Pencil, Plus, Search } from 'lucide-react'
+import { ImageUp, MapPinned, Pencil, Plus, Rotate3d, Search } from 'lucide-react'
 import Input from '@/components/smoothui/input'
 import SmoothButton from '@/components/smoothui/smooth-button'
 import Badge from '@/components/smoothui/badge'
@@ -14,8 +14,11 @@ import Skeleton from '@/components/smoothui/skeleton'
 import { toast } from '@/components/smoothui/toast'
 import PageHeader from '@/components/app/PageHeader'
 import CourtArt, { courtKind } from '@/components/app/CourtArt'
+import SpacePanorama from '@/components/app/SpacePanorama'
 import useAdminSpaces from '@/lib/useAdminSpaces'
 import useSpaceImage, { invalidateSpaceImage } from '@/lib/useSpaceImage'
+import useSpacePanorama, { invalidateSpacePanorama } from '@/lib/useSpacePanorama'
+import { PANORAMA_ACCEPT, validatePanorama } from '@/lib/validatePanorama'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
 import { api, errorMessage } from '@/lib/api'
 import { DISCIPLINES, disciplineName, formatHour, toHHmm } from '@/data/domain'
@@ -51,9 +54,12 @@ function SpaceThumb({ space, version }) {
 }
 
 /** Selector de imagen con vista previa local (PREVIEW o PANORAMA). */
-function ImagePicker({ label, hint, file, onChange, required, current, wide }) {
+function ImagePicker({ label, hint, file, onChange, required, current, wide, panorama = false, onValidatingChange }) {
+  const [validating, setValidating] = useState(false)
+  const validation = useRef(null)
   const local = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => () => local && URL.revokeObjectURL(local), [local])
+  useEffect(() => () => validation.current?.abort(), [])
   const preview = local ?? current
   return (
     <Field>
@@ -81,26 +87,51 @@ function ImagePicker({ label, hint, file, onChange, required, current, wide }) {
           </span>
         )}
         <input
-          accept="image/*"
+          accept={panorama ? PANORAMA_ACCEPT : 'image/*'}
           className="sr-only"
-          onChange={(e) => {
+          onChange={async (e) => {
             const f = e.target.files?.[0]
+            e.target.value = ''
             if (!f) return
             if (f.size > MAX_IMAGE_BYTES) {
               toast.error('Imagen demasiado grande', { description: 'El máximo es 30 MB por archivo.' })
               return
+            }
+            if (panorama) {
+              validation.current?.abort()
+              const controller = new AbortController()
+              validation.current = controller
+              setValidating(true)
+              onValidatingChange?.(true)
+              try {
+                await validatePanorama(f, { signal: controller.signal })
+              } catch (error) {
+                if (!controller.signal.aborted) toast.error('Panorama no válido', { description: error.message })
+                return
+              } finally {
+                if (validation.current === controller) {
+                  setValidating(false)
+                  onValidatingChange?.(false)
+                }
+              }
+              if (controller.signal.aborted) return
             }
             onChange(f)
           }}
           type="file"
         />
       </label>
+      {validating && <p className="text-xs text-muted-foreground" role="status">Validando panorama…</p>}
     </Field>
   )
 }
 
 function ExistingImage({ id, kind, version, children }) {
   return children(useSpaceImage(id, kind, version))
+}
+
+function ExistingPanorama({ id, version, children }) {
+  return children(useSpacePanorama(id, version))
 }
 
 export default function AdminSpaces() {
@@ -111,8 +142,10 @@ export default function AdminSpaces() {
   const [form, setForm] = useState(emptyForm)
   const [images, setImages] = useState({ PREVIEW: null, PANORAMA: null })
   const [saving, setSaving] = useState(false)
+  const [validatingPanorama, setValidatingPanorama] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [imageVersion, setImageVersion] = useState(0)
+  const [viewSpace, setViewSpace] = useState(null)
 
   const visible = spaces.filter((s) => s.name.toLowerCase().includes(query.trim().toLowerCase()))
 
@@ -120,12 +153,14 @@ export default function AdminSpaces() {
     setForm(emptyForm)
     setImages({ PREVIEW: null, PANORAMA: null })
     setFieldErrors({})
+    setValidatingPanorama(false)
     setOpen(true)
   }
   const openEdit = (space) => {
     setForm({ ...space })
     setImages({ PREVIEW: null, PANORAMA: null })
     setFieldErrors({})
+    setValidatingPanorama(false)
     setOpen(true)
   }
 
@@ -158,7 +193,8 @@ export default function AdminSpaces() {
           const data = new FormData()
           data.append('image', images[kind])
           await api(`/admin/spaces/${form.id}/images/${kind}`, { method: 'PUT', form: data })
-          invalidateSpaceImage(form.id, kind)
+          if (kind === 'PANORAMA') invalidateSpacePanorama(form.id)
+          else invalidateSpaceImage(form.id, kind)
         }
         setImageVersion((v) => v + 1)
       } else {
@@ -182,6 +218,7 @@ export default function AdminSpaces() {
   }
 
   const valid =
+    !validatingPanorama &&
     form.name.trim() &&
     form.disciplines.length > 0 &&
     form.open < form.close &&
@@ -277,14 +314,19 @@ export default function AdminSpaces() {
                       </Badge>
                     </td>
                     <td className="px-6 py-3">
-                      <SmoothButton
-                        onClick={() => openEdit(space)}
-                        prefix={<Pencil />}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Editar
-                      </SmoothButton>
+                      <div className="flex flex-wrap gap-2">
+                        <SmoothButton onClick={() => setViewSpace(space)} prefix={<Rotate3d />} size="sm" variant="soft">
+                          Ver 360°
+                        </SmoothButton>
+                        <SmoothButton
+                          onClick={() => openEdit(space)}
+                          prefix={<Pencil />}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Editar
+                        </SmoothButton>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}
@@ -418,24 +460,46 @@ export default function AdminSpaces() {
                 />
               )}
             </ExistingImage>
-            <ExistingImage id={form.id} kind="PANORAMA" version={imageVersion}>
-              {(current) => (
-                <ImagePicker
-                  current={current}
-                  file={images.PANORAMA}
-                  hint="Panorámica 360° (equirectangular)"
-                  label="Panorámica 360°"
-                  onChange={(f) => setImages((i) => ({ ...i, PANORAMA: f }))}
-                  required={!form.id}
-                  wide
-                />
+            <ExistingPanorama id={form.id} version={imageVersion}>
+              {(panorama) => (
+                <div className="space-y-2">
+                  <ImagePicker
+                    current={panorama.url}
+                    file={images.PANORAMA}
+                    hint="Panorámica 360° (equirectangular)"
+                    label="Panorámica 360°"
+                    onChange={(f) => setImages((i) => ({ ...i, PANORAMA: f }))}
+                    onValidatingChange={setValidatingPanorama}
+                    required={!form.id}
+                    wide
+                    panorama
+                  />
+                  {!images.PANORAMA && (panorama.status === 'unavailable' || panorama.status === 'error') && (
+                    <p className="text-xs text-muted-foreground" role="status">{panorama.error?.message}</p>
+                  )}
+                </div>
               )}
-            </ExistingImage>
+            </ExistingPanorama>
           </div>
           <p className="text-xs text-muted-foreground">
             Máximo 30 MB por imagen. El servidor valida el formato por su contenido.
           </p>
+          <p className="text-xs text-muted-foreground">
+            Se admiten panoramas PNG, JPG/JPEG o WebP de cualquier proporción. El visor los estira o comprime a 2:1, sin recortar,
+            hasta un máximo de 4096 × 2048 px. El archivo original no se modifica; las proporciones muy distintas pueden deformarse.
+            {' '}En el Recorrido MVP, las imágenes subidas son temporales: al recargar vuelven los panoramas de public/panoramas/.
+          </p>
         </div>
+      </Dialog>
+
+      <Dialog
+        className="sm:max-w-3xl"
+        description="Arrastra para explorar la cancha. En móvil, usa dos dedos."
+        onOpenChange={(next) => { if (!next) setViewSpace(null) }}
+        open={Boolean(viewSpace)}
+        title={`Vista 360° · ${viewSpace?.name ?? 'Cancha'}`}
+      >
+        {viewSpace && <SpacePanorama className="aspect-[4/3] max-h-[65dvh] w-full sm:aspect-video" space={viewSpace} />}
       </Dialog>
     </div>
   )

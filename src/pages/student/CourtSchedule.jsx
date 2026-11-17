@@ -7,10 +7,8 @@ import ToggleGroupRoot, { ToggleGroupItem } from '@/components/smoothui/toggle-g
 import Alert from '@/components/smoothui/alert'
 import Spinner from '@/components/smoothui/spinner'
 import { toast } from '@/components/smoothui/toast'
-import Court360 from '@/components/app/Court360'
+import SpacePanorama from '@/components/app/SpacePanorama'
 import WeekCalendar from '@/components/app/WeekCalendar'
-import { courtKind } from '@/components/app/CourtArt'
-import useSpaceImage from '@/lib/useSpaceImage'
 import { EASE } from '@/lib/anim'
 import { errorMessage, openEventStream } from '@/lib/api'
 import {
@@ -106,7 +104,6 @@ export default function CourtSchedule() {
   const { me, isAdmin, spaces, spacesLoaded, settings, setDraft, disciplineById, fetchAvailability } =
     useApp()
   const space = spaces.find((s) => s.id === spaceId)
-  const panorama = useSpaceImage(space ? spaceId : null, 'PANORAMA')
 
   const today = todayISO()
   const maxDate = addDays(today, settings.anticipacionMaxDias) // horizonte de 7 días (OQ-09)
@@ -378,11 +375,9 @@ export default function CourtSchedule() {
           transition={{ duration: 0.9, ease: EASE, delay: 0.3 }}
         >
           <div className="space-y-4 lg:sticky lg:top-24">
-            <Court360
+            <SpacePanorama
               className="aspect-[4/3] w-full lg:aspect-auto lg:h-[min(30rem,calc(100dvh-20rem))]"
-              imageUrl={panorama}
-              kind={courtKind(space)}
-              name={space.name}
+              space={space}
             />
             <SelectionPanel className="hidden lg:block" {...panelProps} />
           </div>
