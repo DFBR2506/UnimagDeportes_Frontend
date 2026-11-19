@@ -8,6 +8,7 @@ export default defineConfig({
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
   test: {
+    include: ['src/**/*.test.{js,jsx}'],
     environment: 'node',
     clearMocks: true,
     restoreMocks: true,

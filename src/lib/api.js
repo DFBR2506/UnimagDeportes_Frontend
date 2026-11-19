@@ -2,6 +2,7 @@
 // Contratos: Unimag-Deportes/docs/techincal-plan/contracts/README.md
 
 import { ApiError } from '@/lib/apiError'
+import { DEMO_ENABLED } from '@/lib/config'
 import { isDemoToken, mockRequest } from '@/lib/mockApi'
 
 export { ApiError }
@@ -13,6 +14,10 @@ const TOKEN_KEY = 'ud-token'
 let token = null
 try {
   token = localStorage.getItem(TOKEN_KEY)
+  if (!DEMO_ENABLED && isDemoToken(token)) {
+    token = null
+    localStorage.removeItem(TOKEN_KEY)
+  }
 } catch {
   // almacenamiento no disponible: la sesión vive solo en memoria
 }
@@ -20,6 +25,12 @@ try {
 export const getToken = () => token
 
 export const setToken = (value) => {
+  if (!DEMO_ENABLED && isDemoToken(value)) {
+    throw new ApiError(403, {
+      code: 'DEMO_DISABLED',
+      message: 'El modo demostración está desactivado.',
+    })
+  }
   token = value
   try {
     if (value) localStorage.setItem(TOKEN_KEY, value)
@@ -65,10 +76,11 @@ const parseError = async (res) => {
  */
 export async function api(path, { method = 'GET', body, form, query, as = 'json', auth = true, signal } = {}) {
   // Recorrido MVP: la sesión de demostración se atiende en el navegador, sin backend.
-  if (isDemoToken(token)) return mockRequest(token, path, { method, body, form, query, as, signal })
+  if (DEMO_ENABLED && isDemoToken(token)) return mockRequest(token, path, { method, body, form, query, as, signal })
 
+  const requestToken = token
   const headers = {}
-  if (auth && token) headers.Authorization = `Bearer ${token}`
+  if (auth && requestToken) headers.Authorization = `Bearer ${requestToken}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
   let res
@@ -86,7 +98,7 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
 
   if (!res.ok) {
     const error = await parseError(res)
-    if (auth && (res.status === 401 || error.code === 'PROFILE_INCOMPLETE')) emit(error)
+    if (auth && requestToken === token && (res.status === 401 || error.code === 'PROFILE_INCOMPLETE')) emit(error)
     throw error
   }
   if (res.status === 204) return null
@@ -102,17 +114,19 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
  * Devuelve una función para cerrar el flujo.
  */
 export function openEventStream(path, onEvent) {
-  if (isDemoToken(token)) return () => {} // sin backend no hay flujo en vivo
+  if (DEMO_ENABLED && isDemoToken(token)) return () => {} // sin backend no hay flujo en vivo
+  const requestToken = token
   const controller = new AbortController()
   ;(async () => {
-    while (!controller.signal.aborted) {
+    while (!controller.signal.aborted && requestToken === token) {
       try {
         const res = await fetch(buildUrl(path), {
-          headers: { Accept: 'text/event-stream', Authorization: `Bearer ${token}` },
+          headers: { Accept: 'text/event-stream', Authorization: `Bearer ${requestToken}` },
           signal: controller.signal,
         })
         if (!res.ok || !res.body) {
-          if (res.status === 401) emit(await parseError(res))
+          const error = await parseError(res)
+          if (requestToken === token && (res.status === 401 || error.code === 'PROFILE_INCOMPLETE')) emit(error)
           return
         }
         const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -138,13 +152,14 @@ export function openEventStream(path, onEvent) {
               } catch {
                 // texto plano
               }
-              onEvent(name, parsed)
+              if (!controller.signal.aborted && requestToken === token) onEvent(name, parsed)
             }
           }
         }
       } catch (err) {
         if (err?.name === 'AbortError') return
       }
+      if (controller.signal.aborted || requestToken !== token) return
       // reconexión suave si el servidor cerró el flujo
       await new Promise((r) => setTimeout(r, 5000))
     }

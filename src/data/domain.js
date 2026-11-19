@@ -11,6 +11,12 @@ export const DISCIPLINES = [
 
 export const disciplineName = (id) => DISCIPLINES.find((d) => d.id === id)?.name ?? id
 
+export const INCOMPATIBLE_FOOTBALL_MESSAGE =
+  'Fútbol 5 y Fútbol 11 no pueden pertenecer al mismo espacio.'
+
+export const hasIncompatibleDisciplines = (disciplines) =>
+  disciplines.includes('FOOTBALL_5') && disciplines.includes('FOOTBALL_11')
+
 export const RESERVATION_STATES = {
   confirmada: { label: 'Confirmada', badge: 'default' },
   'en-uso': { label: 'En uso', badge: 'success' },
@@ -207,7 +213,7 @@ export const mapRules = (r) => ({
 export const DEFAULT_SETTINGS = {
   franjaMin: 60,
   maxFranjas: 2,
-  anticipacionMaxDias: 7,
+  anticipacionMaxDias: 6,
   anticipacionMinMin: 0,
   toleranciaMin: 10,
   cuotaSemanalHoras: 4,

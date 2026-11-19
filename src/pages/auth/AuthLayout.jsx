@@ -110,7 +110,7 @@ export default function AuthLayout() {
         animate={{ opacity: 1 }}
         transition={{ duration: DUR.item, ease: EASE, delay: 0.6 }}
       >
-        Universidad del Magdalena · Prototipo académico simulado
+        Universidad del Magdalena · Unimag Deportes
       </motion.footer>
       <Toaster />
     </div>

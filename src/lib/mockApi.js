@@ -9,6 +9,8 @@ import { DEMO_CATALOG_VERSION, DEMO_PANORAMAS, DEMO_SPACE_IDS as SPACE_IDS, migr
 import {
   addDays,
   bogotaParts,
+  hasIncompatibleDisciplines,
+  INCOMPATIBLE_FOOTBALL_MESSAGE,
   mondayOf,
   parseHour,
   toInstant,
@@ -22,7 +24,7 @@ const HOUR = 3_600_000
 const TOLERANCE_MIN = 10
 const LATE_MIN = 60
 const CHECKIN_OPENS_MIN = 10
-const MAX_DAYS = 7
+const MAX_DAYS = 6
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
 
 export const isDemoToken = (token) => typeof token === 'string' && token.startsWith('demo:')
@@ -587,6 +589,7 @@ route('POST', '/admin/spaces', async ({ s, form }) => {
   if (!/^\d{2}:\d{2}$/.test(input.closingTime ?? '')) fields.closingTime = 'formato HH:mm'
   else if (input.openingTime >= input.closingTime) fields.closingTime = 'debe ser mayor que openingTime'
   if (!input.disciplines?.length) fields.disciplines = 'al menos una disciplina'
+  else if (hasIncompatibleDisciplines(input.disciplines)) fields.disciplines = INCOMPATIBLE_FOOTBALL_MESSAGE
   if (!(form.get('preview') instanceof Blob)) fields.preview = 'imagen obligatoria'
   if (!(form.get('panorama') instanceof Blob)) fields.panorama = 'imagen obligatoria'
   if (Object.keys(fields).length) invalid(fields)
@@ -615,6 +618,7 @@ route('PUT', '/admin/spaces/:id', ({ s, params, body }) => {
   if (!String(next.name ?? '').trim()) fields.name = 'no puede estar vacío'
   if (next.openingTime >= next.closingTime) fields.closingTime = 'debe ser mayor que openingTime'
   if (!next.disciplines?.length) fields.disciplines = 'al menos una disciplina'
+  else if (hasIncompatibleDisciplines(next.disciplines)) fields.disciplines = INCOMPATIBLE_FOOTBALL_MESSAGE
   if (Object.keys(fields).length) invalid(fields)
   Object.assign(space, { ...next, name: next.name.trim(), requirements: next.requirements ?? '' })
   save()

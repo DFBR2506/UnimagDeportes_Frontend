@@ -21,7 +21,7 @@ import useSpacePanorama, { invalidateSpacePanorama } from '@/lib/useSpacePanoram
 import { PANORAMA_ACCEPT, validatePanorama } from '@/lib/validatePanorama'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
 import { api, errorMessage } from '@/lib/api'
-import { DISCIPLINES, disciplineName, formatHour, toHHmm } from '@/data/domain'
+import { DISCIPLINES, disciplineName, formatHour, hasIncompatibleDisciplines, INCOMPATIBLE_FOOTBALL_MESSAGE, toHHmm } from '@/data/domain'
 import { useApp } from '@/store'
 import { cn } from '@/lib/utils'
 
@@ -165,6 +165,7 @@ export default function AdminSpaces() {
   }
 
   const toggleDiscipline = (id, checked) => {
+    setFieldErrors((errors) => ({ ...errors, disciplines: null }))
     setForm((f) => ({
       ...f,
       disciplines: checked ? [...f.disciplines, id] : f.disciplines.filter((d) => d !== id),
@@ -182,6 +183,10 @@ export default function AdminSpaces() {
   })
 
   const save = async () => {
+    if (hasIncompatibleDisciplines(form.disciplines)) {
+      setFieldErrors({ disciplines: INCOMPATIBLE_FOOTBALL_MESSAGE })
+      return
+    }
     setSaving(true)
     setFieldErrors({})
     try {
@@ -221,6 +226,7 @@ export default function AdminSpaces() {
     !validatingPanorama &&
     form.name.trim() &&
     form.disciplines.length > 0 &&
+    !hasIncompatibleDisciplines(form.disciplines) &&
     form.open < form.close &&
     Number(form.aforo) > 0 &&
     (form.id || (images.PREVIEW && images.PANORAMA))
@@ -377,6 +383,7 @@ export default function AdminSpaces() {
                 <label className="flex items-center gap-2 text-sm" key={d.id}>
                   <Checkbox
                     checked={form.disciplines.includes(d.id)}
+                    disabled={!form.disciplines.includes(d.id) && hasIncompatibleDisciplines([...form.disciplines, d.id])}
                     onCheckedChange={(checked) => toggleDiscipline(d.id, checked)}
                   />
                   {d.name}
@@ -384,6 +391,10 @@ export default function AdminSpaces() {
               ))}
             </div>
             {fieldError('disciplines')}
+            <p className="mt-2 text-xs text-muted-foreground">
+              {INCOMPATIBLE_FOOTBALL_MESSAGE}
+              {hasIncompatibleDisciplines(form.disciplines) && ' Retira una modalidad para guardar.'}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
