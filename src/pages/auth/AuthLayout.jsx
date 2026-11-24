@@ -5,20 +5,17 @@ import Toaster from '@/components/smoothui/toast'
 import Logo from '@/components/app/Logo'
 import { DUR, EASE, pageVariants } from '@/lib/anim'
 import { cn } from '@/lib/utils'
-
-const STEPS = [
-  { label: 'Correo', paths: ['/acceso', '/acceso/no-permitido'] },
-  { label: 'Código', paths: ['/acceso/codigo'] },
-  { label: 'Perfil', paths: ['/acceso/nombre'] },
-]
+import { useApp } from '@/store'
+import { resolveAccessProgress } from './accessSteps'
 
 /** Progreso del acceso (correo → código → perfil); no aparece en la bienvenida. */
-function StepIndicator({ pathname }) {
-  const current = STEPS.findIndex((s) => s.paths.includes(pathname))
-  if (current < 0) return null
+function StepIndicator({ pathname, needsName }) {
+  const progress = resolveAccessProgress(pathname, needsName)
+  if (!progress) return null
+  const { steps, current } = progress
   return (
     <ol aria-label="Progreso del acceso" className="mb-6 flex items-center justify-center gap-1.5 sm:mb-8 sm:gap-2">
-      {STEPS.map((step, i) => {
+      {steps.map((step, i) => {
         const done = i < current
         const active = i === current
         return (
@@ -51,6 +48,7 @@ function StepIndicator({ pathname }) {
  */
 export default function AuthLayout() {
   const location = useLocation()
+  const { me } = useApp()
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden bg-background">
       {/* Fondo decorativo animado, muy lento */}
@@ -88,7 +86,7 @@ export default function AuthLayout() {
         >
           <div aria-hidden className="h-1.5 bg-gradient-to-r from-sidebar via-accent to-sidebar" />
           <div className="px-5 pt-7 pb-8 sm:px-10 sm:pt-10 sm:pb-11">
-            <StepIndicator pathname={location.pathname} />
+            <StepIndicator needsName={Boolean(me?.needsName)} pathname={location.pathname} />
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
