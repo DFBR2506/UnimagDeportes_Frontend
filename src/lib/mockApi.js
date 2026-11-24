@@ -24,6 +24,8 @@ const HOUR = 3_600_000
 const TOLERANCE_MIN = 10
 const LATE_MIN = 60
 const CHECKIN_OPENS_MIN = 10
+const CHECKIN_AFTER_END_MIN = 60
+const DAILY_HOURS = 2
 const MAX_DAYS = 6
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
 
@@ -184,9 +186,9 @@ const reservationDto = (s, r) => ({
 
 const rulesDto = (s) => ({
   reservation: { slotMinutes: 60, maxSlotsPerReservation: 2, maxAdvanceDays: MAX_DAYS, minAdvanceMinutes: 0, bookingToleranceMinutes: TOLERANCE_MIN },
-  quota: { weeklyHours: s.params.weeklyHours, weekStartsOn: 'MONDAY', timeZone: 'America/Bogota' },
+  quota: { weeklyHours: s.params.weeklyHours, dailyHours: DAILY_HOURS, weekStartsOn: 'MONDAY', timeZone: 'America/Bogota' },
   cancellation: { lateThresholdMinutes: LATE_MIN },
-  checkIn: { opensMinutesBefore: CHECKIN_OPENS_MIN, closesAtReservationEnd: true },
+  checkIn: { opensMinutesBefore: CHECKIN_OPENS_MIN, closesAtReservationEnd: false, closesMinutesAfterEnd: CHECKIN_AFTER_END_MIN },
   reminder: { hoursBefore: 2 },
   sanctions: { noShowsForSuspension: s.params.noShows, window: 'CALENDAR_MONTH', suspensionDays: 7 },
   emailDomain: '@unimagdalena.edu.co',
@@ -389,6 +391,21 @@ route('POST', '/reservations', ({ s, user, body }) => {
     (r) => r.userId === user.id && ACTIVE.includes(r.status) && new Date(r.startAt) < endMs && new Date(r.endAt) > startMs
   )
   if (overlaps) fail(409, 'OVERLAPPING_RESERVATION', 'Ya tienes una reserva que se solapa con esa franja.')
+
+  // RN-67: máximo diario fijo de 2 h por fecha en America/Bogota, entre todos los espacios;
+  // se valida antes de la cuota semanal y con los mismos estados de consumo.
+  const dailyUsed = s.reservations
+    .filter((r) => r.userId === user.id && COUNTS_FOR_QUOTA.includes(r.status) && bogotaParts(r.startAt).date === start.date)
+    .reduce((acc, r) => acc + resHours(r), 0)
+  if (dailyUsed + slots > DAILY_HOURS) {
+    fail(409, 'DAILY_QUOTA_EXCEEDED', `La reserva supera el máximo diario de ${DAILY_HOURS} horas.`, {
+      date: start.date,
+      dailyLimitHours: DAILY_HOURS,
+      usedHours: dailyUsed,
+      requestedHours: slots,
+      availableHours: Math.max(0, DAILY_HOURS - dailyUsed),
+    })
+  }
 
   const monday = mondayOf(start.date)
   const used = quotaUsed(s, user.id, monday)

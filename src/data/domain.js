@@ -192,6 +192,10 @@ export const mapQuota = (q) => ({
   resetAt: q.resetAt,
 })
 
+/** Máximo diario fijo y cierre del check-in según el contrato de GET /rules. */
+const DAILY_HOURS = 2
+const CHECKIN_CLOSES_AFTER_MIN = 60
+
 /** GET /rules (o /admin/parameters) → parámetros que muestran las pantallas. */
 export const mapRules = (r) => ({
   franjaMin: r.reservation.slotMinutes,
@@ -200,9 +204,11 @@ export const mapRules = (r) => ({
   anticipacionMinMin: r.reservation.minAdvanceMinutes,
   toleranciaMin: r.reservation.bookingToleranceMinutes,
   cuotaSemanalHoras: r.quota.weeklyHours,
+  cuotaDiariaHoras: r.quota.dailyHours ?? DAILY_HOURS,
   cancelacionTardiaMin: r.cancellation.lateThresholdMinutes,
   checkinAntesMin: r.checkIn.opensMinutesBefore,
   checkinCierraAlFinal: r.checkIn.closesAtReservationEnd,
+  checkinCierraMinDespues: r.checkIn.closesMinutesAfterEnd ?? CHECKIN_CLOSES_AFTER_MIN,
   recordatorioHoras: r.reminder.hoursBefore,
   inasistenciasSuspension: r.sanctions.noShowsForSuspension,
   diasSuspension: r.sanctions.suspensionDays,
@@ -217,9 +223,11 @@ export const DEFAULT_SETTINGS = {
   anticipacionMinMin: 0,
   toleranciaMin: 10,
   cuotaSemanalHoras: 4,
+  cuotaDiariaHoras: DAILY_HOURS,
   cancelacionTardiaMin: 60,
   checkinAntesMin: 10,
-  checkinCierraAlFinal: true,
+  checkinCierraAlFinal: false,
+  checkinCierraMinDespues: CHECKIN_CLOSES_AFTER_MIN,
   recordatorioHoras: 2,
   inasistenciasSuspension: 3,
   diasSuspension: 7,

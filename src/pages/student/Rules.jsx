@@ -22,7 +22,7 @@ const explain = (s) => [
   },
   {
     q: '¿Cómo confirmo mi asistencia?',
-    a: `Escanea el QR fijo impreso en la entrada del espacio. La ventana abre ${s.checkinAntesMin} minutos antes del inicio${s.checkinCierraAlFinal ? ' y cierra cuando termina la reserva' : ''}.`,
+    a: `Escanea el QR fijo impreso en la entrada del espacio. La ventana abre ${s.checkinAntesMin} minutos antes del inicio${s.checkinCierraAlFinal ? ' y cierra cuando termina la reserva' : ` y cierra hasta ${s.checkinCierraMinDespues} minutos después del fin, inclusive`}.`,
   },
   {
     q: '¿Puedo pedir implementos?',
@@ -53,7 +53,7 @@ export default function Rules() {
     ['Cancelación tardía', `Menos de ${settings.cancelacionTardiaMin} minutos`],
     [
       'Ventana de check-in',
-      `${settings.checkinAntesMin} min antes${settings.checkinCierraAlFinal ? ' hasta el fin de la reserva' : ''}`,
+      `${settings.checkinAntesMin} min antes${settings.checkinCierraAlFinal ? ' hasta el fin de la reserva' : ` hasta ${settings.checkinCierraMinDespues} min después del fin`}`,
     ],
     ['Recordatorio', `${settings.recordatorioHoras} horas antes por correo`],
     [

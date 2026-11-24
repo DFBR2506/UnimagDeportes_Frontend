@@ -19,7 +19,7 @@ const readOnlyRows = (s) => [
   ['Anticipación máxima', `${s.anticipacionMaxDias} días`],
   ['Tolerancia', `${s.toleranciaMin} minutos`],
   ['Cancelación tardía', `Menos de ${s.cancelacionTardiaMin} minutos`],
-  ['Ventana de check-in', `${s.checkinAntesMin} min antes${s.checkinCierraAlFinal ? ' hasta el fin' : ''}`],
+  ['Ventana de check-in', `${s.checkinAntesMin} min antes${s.checkinCierraAlFinal ? ' hasta el fin' : ` hasta ${s.checkinCierraMinDespues} min después del fin`}`],
   ['Recordatorio', `${s.recordatorioHoras} horas antes`],
   ['Suspensión', `${s.diasSuspension} días (mes calendario)`],
   ['Dominio de correo', s.emailDomain],

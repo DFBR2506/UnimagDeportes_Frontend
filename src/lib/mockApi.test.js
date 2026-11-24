@@ -159,3 +159,66 @@ describe('canchas de los recorridos MVP', () => {
     expect(saved.blocks[0].id).toBe('keep-block')
   })
 })
+
+describe('check-in por identificador (UC05)', () => {
+  const SPACE = DEMO_SPACE_IDS.multiple1
+  // Nota: el estado simulado se carga en memoria en la primera petición del test;
+  // cada prueba define su semilla y su reloj al inicio (resetModules entre pruebas).
+  const demoRes = (id, startHour, endHour, extra = {}) => ({
+    id,
+    spaceId: SPACE,
+    startAt: `2026-11-24T${String(startHour).padStart(2, '0')}:00:00-05:00`,
+    endAt: `2026-11-24T${String(endHour).padStart(2, '0')}:00:00-05:00`,
+    status: 'CONFIRMED',
+    createdAt: '2026-11-23T18:00:00-05:00',
+    checkedInAt: null,
+    equipment: [],
+    userId: 'demo-student',
+    ...extra,
+  })
+  const seedReservations = (reservations) => {
+    storage.set('ud-demo-state-v1', JSON.stringify({
+      catalogVersion: 2,
+      spaces: [{ id: SPACE, name: 'Cancha múltiple 1', capacity: 20, status: 'ACTIVE', disciplines: ['BASKETBALL'], openingTime: '08:00', closingTime: '20:00' }],
+      reservations,
+      blocks: [],
+      equipment: [],
+      params: { weeklyHours: 4, noShows: 3 },
+    }))
+  }
+
+  it('aplica el máximo diario fijo de 2 horas en la creación y lo declara en /rules', async () => {
+    // random fijo: sleep determinista y sin el conflicto aleatorio del 12 % (RN-10).
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    seedReservations([demoRes('res-hoy', 8, 9)])
+    vi.setSystemTime(new Date('2026-11-24T13:00:00-05:00'))
+
+    const rules = await request('/rules')
+    expect(rules.quota.dailyHours).toBe(2)
+    expect(rules.checkIn).toEqual({ opensMinutesBefore: 10, closesAtReservationEnd: false, closesMinutesAfterEnd: 60 })
+
+    // Busca una pareja de franjas libres y reservables que no cruce la reserva de las 8.
+    const { slots } = await request(`/spaces/${SPACE}/availability`, { query: { date: '2026-11-24' } })
+    const index = slots.findIndex(
+      (slot, i) => slot.status === 'FREE' && slot.bookable && slots[i + 1]?.status === 'FREE'
+    )
+    expect(index).toBeGreaterThanOrEqual(0)
+    const hour = String(index + 8).padStart(2, '0')
+
+    const twoHours = request('/reservations', {
+      method: 'POST',
+      body: { spaceId: SPACE, startAt: `2026-11-24T${hour}:00:00-05:00`, slots: 2 },
+    })
+    await expect(twoHours).rejects.toMatchObject({
+      status: 409,
+      code: 'DAILY_QUOTA_EXCEEDED',
+      details: { date: '2026-11-24', dailyLimitHours: 2, usedHours: 1, requestedHours: 2, availableHours: 1 },
+    })
+
+    const one = await request('/reservations', {
+      method: 'POST',
+      body: { spaceId: SPACE, startAt: `2026-11-24T${hour}:00:00-05:00`, slots: 1 },
+    })
+    expect(one.status).toBe('CONFIRMED')
+  })
+})
