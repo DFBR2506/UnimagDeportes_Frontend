@@ -84,14 +84,14 @@ export default function AdminBlocks() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Bloquear franjas"
         subtitle="Los bloqueos tienen prioridad sobre las reservas futuras."
       />
 
       <motion.form
-        className="rounded-2xl border border-border bg-card p-7 shadow-xs md:p-9"
+        className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 md:p-9"
         onSubmit={submit}
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -119,8 +119,8 @@ export default function AdminBlocks() {
             </Field>
           </motion.div>
 
-          <motion.div className="grid gap-5 md:grid-cols-3" {...staggerChild}>
-            <Field>
+          <motion.div className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-3 md:gap-5" {...staggerChild}>
+            <Field className="max-md:col-span-2">
               <FieldLabel htmlFor="block-date">{recurrent ? 'Desde' : 'Fecha'}</FieldLabel>
               <Input
                 id="block-date"
@@ -166,6 +166,7 @@ export default function AdminBlocks() {
               <p className="mb-2 text-sm font-medium">Modalidad</p>
               <ToggleGroupRoot
                 aria-label="Modalidad del bloqueo"
+                className="max-sm:flex max-sm:*:flex-1 max-sm:*:px-1"
                 onValueChange={(v) => v.length && setMode(v[0])}
                 value={[mode]}
               >
@@ -180,7 +181,7 @@ export default function AdminBlocks() {
                   <p className="mb-2 text-sm font-medium">Se repite los</p>
                   <ToggleGroupRoot
                     aria-label="Días de la semana"
-                    className="flex-wrap"
+                    className="flex-wrap max-sm:grid max-sm:grid-cols-7 max-sm:*:px-0 max-sm:*:text-xs"
                     onValueChange={setDays}
                     type="multiple"
                     value={days}
@@ -208,6 +209,7 @@ export default function AdminBlocks() {
 
           <motion.div {...staggerChild}>
             <SmoothButton
+              className="max-sm:w-full"
               color="accent"
               disabled={!valid}
               loading={saving}
@@ -229,7 +231,7 @@ export default function AdminBlocks() {
             {created.map((b) => (
               <motion.li
                 key={b.key}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-xs"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 shadow-xs sm:px-5"
                 {...staggerChild}
               >
                 <div className="min-w-0">

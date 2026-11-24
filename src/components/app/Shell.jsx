@@ -8,38 +8,38 @@ import {
   Gauge,
   Home,
   LogOut,
-  Menu,
+  MessageCircle,
   ScrollText,
   ShieldCheck,
   SquareStack,
   TimerOff,
   UserRound,
 } from 'lucide-react'
-import { SidebarMenuButton, SidebarProvider } from '@/components/smoothui/sidebar'
-import Drawer from '@/components/smoothui/drawer'
+import { SidebarProvider } from '@/components/smoothui/sidebar'
 import DropdownMenu from '@/components/smoothui/dropdown-menu'
 import Avatar from '@/components/smoothui/avatar'
 import ContactFab from '@/components/app/ContactDialog'
 import Toaster from '@/components/smoothui/toast'
 import Spinner from '@/components/smoothui/spinner'
-import SmoothButton from '@/components/smoothui/smooth-button'
 import Logo from '@/components/app/Logo'
 import { pageVariants } from '@/lib/anim'
+import { resetMobileScroll } from '@/lib/scroll'
 import { useApp } from '@/store'
 import { cn } from '@/lib/utils'
 
-// Mi cuota y Reglas de uso viven dentro de Mis reservas; el contacto es un botón flotante.
+// Mi cuota y Reglas de uso viven dentro de Mis reservas; el contacto es un botón flotante
+// (en móvil, un elemento de la barra inferior). `short` es la etiqueta de esa barra.
 export const STUDENT_NAV = [
   { to: '/app/inicio', label: 'Inicio', icon: Home },
-  { to: '/app/disponibilidad', label: 'Disponibilidad', icon: CalendarDays },
-  { to: '/app/mis-reservas', label: 'Mis reservas', icon: ClipboardList },
+  { to: '/app/disponibilidad', label: 'Disponibilidad', short: 'Canchas', icon: CalendarDays },
+  { to: '/app/mis-reservas', label: 'Mis reservas', short: 'Reservas', icon: ClipboardList },
 ]
 
 export const ADMIN_NAV = [
-  { to: '/admin', label: 'Panel de ocupación', icon: Gauge, exact: true },
+  { to: '/admin', label: 'Panel de ocupación', short: 'Panel', icon: Gauge, exact: true },
   { to: '/admin/espacios', label: 'Espacios', icon: SquareStack },
-  { to: '/admin/bloqueos', label: 'Bloquear franjas', icon: TimerOff },
-  { to: '/admin/reglas', label: 'Reglas de uso', icon: ScrollText },
+  { to: '/admin/bloqueos', label: 'Bloquear franjas', short: 'Bloqueos', icon: TimerOff },
+  { to: '/admin/reglas', label: 'Reglas de uso', short: 'Reglas', icon: ScrollText },
 ]
 
 const VARIANTS = {
@@ -47,22 +47,20 @@ const VARIANTS = {
     nav: STUDENT_NAV,
     home: '/app/inicio',
     navClass: 'md:flex',
-    burgerClass: 'md:hidden',
+    bottomBarClass: 'md:hidden',
+    pageClass: 'max-md:pb-[calc(var(--bottom-bar-space)+1rem)]',
+    toasterClass: 'max-md:bottom-[var(--bottom-bar-space)]',
   },
   admin: {
     nav: ADMIN_NAV,
     home: '/admin',
     // cuatro secciones + distintivo ADMIN no caben en md
     navClass: 'lg:flex',
-    burgerClass: 'lg:hidden',
+    bottomBarClass: 'lg:hidden',
+    pageClass: 'max-lg:pb-[calc(var(--bottom-bar-space)+1rem)]',
+    toasterClass: 'max-lg:bottom-[var(--bottom-bar-space)]',
   },
 }
-
-const navButtonClass = (active) =>
-  cn(
-    'text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring',
-    active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
-  )
 
 const isActive = (pathname, { to, exact }) =>
   exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`)
@@ -109,73 +107,60 @@ function TopNav({ items, className }) {
   )
 }
 
-function MobileTopNav({ items, extra, className }) {
-  const [open, setOpen] = useState(false)
+/** Barra inferior de móvil con las secciones principales. */
+function BottomBar({ items, className }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const go = (fn) => {
-    fn()
-    setOpen(false)
-  }
   return (
-    <Drawer
-      open={open}
-      onOpenChange={setOpen}
-      side="left"
-      title="Unimag Deportes"
-      className="bg-sidebar text-sidebar-foreground"
-      trigger={
-        <SmoothButton
-          aria-label="Abrir menú"
-          className={cn('text-white hover:bg-white/10', className)}
-          size="icon-sm"
-          variant="ghost"
-        >
-          <Menu />
-        </SmoothButton>
-      }
+    <nav
+      aria-label="Principal"
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-40 bg-sidebar pb-[env(safe-area-inset-bottom,0px)] text-sidebar-foreground shadow-[0_-4px_12px_rgb(3_41_79/0.15)] print:hidden',
+        className
+      )}
     >
-      <div className="flex min-h-[60vh] flex-col gap-1 pb-4">
+      <ul className="mx-auto grid h-16 max-w-xl auto-cols-fr grid-flow-col">
         {items.map((item) => {
-          const { to, label, icon: Icon } = item
-          const active = isActive(location.pathname, item)
+          const { to, label, short = label, icon: Icon, onSelect } = item
+          const active = Boolean(to) && isActive(location.pathname, item)
           return (
-            <SidebarMenuButton
-              key={to}
-              active={active}
-              className={navButtonClass(active)}
-              icon={<Icon />}
-              onClick={() => go(() => navigate(to))}
-            >
-              {label}
-            </SidebarMenuButton>
+            <li key={to ?? label}>
+              <button
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'relative flex size-full cursor-pointer flex-col items-center justify-center gap-1 text-[11px] leading-none font-medium transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-inset',
+                  active ? 'text-white' : 'text-sidebar-foreground/70'
+                )}
+                onClick={onSelect ?? (() => navigate(to))}
+                type="button"
+              >
+                {active && (
+                  <motion.span
+                    className="absolute inset-x-4 top-0 h-[3px] rounded-b-full bg-sidebar-primary"
+                    layoutId="bottombar-indicator"
+                    transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+                  />
+                )}
+                <Icon aria-hidden className={cn('size-5', active && 'text-sidebar-primary')} />
+                {short}
+              </button>
+            </li>
           )
         })}
-        <div className="mt-auto flex flex-col gap-1">
-          {extra.map(({ key, label, icon, onSelect }) => (
-            <SidebarMenuButton
-              key={key}
-              className={navButtonClass(false)}
-              icon={icon}
-              onClick={() => go(onSelect)}
-            >
-              {label}
-            </SidebarMenuButton>
-          ))}
-        </div>
-      </div>
-    </Drawer>
+      </ul>
+    </nav>
   )
 }
 
 /**
  * Estructura común (RNF-02 móvil primero): topbar azul institucional para
- * estudiantes y administradores; en pantallas pequeñas la navegación va en un drawer.
+ * estudiantes y administradores; en pantallas pequeñas la navegación va en una barra inferior.
  */
 export default function Shell({ variant = 'student' }) {
   const { token, session, logout, isAdmin, sessionNotice } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
+  const [contactOpen, setContactOpen] = useState(false)
 
   // Sin token: al acceso, recordando el destino (RN-34, RN-56: tras vencer, se vuelve a la pantalla de origen).
   if (!token) {
@@ -204,6 +189,11 @@ export default function Shell({ variant = 'student' }) {
   }
 
   const config = VARIANTS[variant]
+
+  const bottomBarItems =
+    variant === 'student'
+      ? [...config.nav, { label: 'Contacto', icon: MessageCircle, onSelect: () => setContactOpen(true) }]
+      : config.nav
 
   const onLogout = async () => {
     await logout()
@@ -239,7 +229,6 @@ export default function Shell({ variant = 'student' }) {
       <div className="min-h-dvh bg-background">
         <header className="sticky top-0 z-40 bg-sidebar text-sidebar-foreground shadow-md shadow-sidebar/20 print:hidden">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 md:px-8">
-            <MobileTopNav className={config.burgerClass} extra={accountActions} items={config.nav} />
             <button className="cursor-pointer rounded-md focus-ring" onClick={() => navigate(config.home)} type="button">
               <Logo className="text-base text-white" />
             </button>
@@ -254,7 +243,7 @@ export default function Shell({ variant = 'student' }) {
             <div className="ml-auto">
               <DropdownMenu align="end" items={userMenu}>
                 <button
-                  className="flex cursor-pointer items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors hover:bg-white/10 focus-ring"
+                  className="flex cursor-pointer items-center gap-2 rounded-full py-1 pr-2 pl-1 pointer-coarse:py-2 transition-colors hover:bg-white/10 focus-ring"
                   type="button"
                 >
                   <Avatar
@@ -272,10 +261,10 @@ export default function Shell({ variant = 'student' }) {
         </header>
 
         <main>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" onExitComplete={resetMobileScroll}>
             <motion.div
               key={transitionKey(location.pathname)}
-              className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10"
+              className={cn('mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-10', config.pageClass)}
               variants={pageVariants}
               initial="initial"
               animate="animate"
@@ -286,8 +275,9 @@ export default function Shell({ variant = 'student' }) {
           </AnimatePresence>
         </main>
       </div>
-      {variant === 'student' && <ContactFab />}
-      <Toaster />
+      <BottomBar className={config.bottomBarClass} items={bottomBarItems} />
+      {variant === 'student' && <ContactFab open={contactOpen} onOpenChange={setContactOpen} />}
+      <Toaster className={config.toasterClass} />
     </SidebarProvider>
   )
 }

@@ -7,7 +7,7 @@ import {
 import { cn } from '@/lib/utils'
 
 const SLOT_CLASS =
-  'h-14 w-11 rounded-xl bg-background font-display text-2xl text-foreground sm:w-13 data-[active=true]:border-accent data-[active=true]:ring-accent/30'
+  'h-12 w-full max-w-11 min-w-0 rounded-xl bg-background font-display text-xl text-foreground sm:h-14 sm:w-13 sm:max-w-none sm:text-2xl data-[active=true]:border-accent data-[active=true]:ring-accent/30'
 
 /** Código de 6 dígitos (RN-51) con el componente OTP de SmoothUI. */
 export default function CodeInput({ value, onChange, onComplete, invalid, className, ...props }) {
@@ -22,13 +22,13 @@ export default function CodeInput({ value, onChange, onComplete, invalid, classN
       value={value}
       {...props}
     >
-      <InputOTPGroup className="gap-1.5 sm:gap-2">
+      <InputOTPGroup className="min-w-0 flex-1 justify-end gap-1.5 sm:flex-none sm:gap-2">
         {[0, 1, 2].map((i) => (
           <InputOTPSlot key={i} className={slot} index={i} />
         ))}
       </InputOTPGroup>
       <InputOTPSeparator />
-      <InputOTPGroup className="gap-1.5 sm:gap-2">
+      <InputOTPGroup className="min-w-0 flex-1 gap-1.5 sm:flex-none sm:gap-2">
         {[3, 4, 5].map((i) => (
           <InputOTPSlot key={i} className={slot} index={i} />
         ))}

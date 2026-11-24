@@ -57,9 +57,9 @@ export default function RequestCode() {
   }
 
   return (
-    <motion.form className="space-y-8" onSubmit={submit} {...staggerParent}>
+    <motion.form className="space-y-6 sm:space-y-8" onSubmit={submit} {...staggerParent}>
       <motion.div className="space-y-3" {...staggerChild}>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground min-[360px]:text-3xl sm:text-4xl">
           Iniciar sesión
         </h1>
         <p className="text-muted-foreground">

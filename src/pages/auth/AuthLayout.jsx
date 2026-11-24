@@ -17,19 +17,19 @@ function StepIndicator({ pathname }) {
   const current = STEPS.findIndex((s) => s.paths.includes(pathname))
   if (current < 0) return null
   return (
-    <ol aria-label="Progreso del acceso" className="mb-8 flex items-center justify-center gap-2">
+    <ol aria-label="Progreso del acceso" className="mb-6 flex items-center justify-center gap-1.5 sm:mb-8 sm:gap-2">
       {STEPS.map((step, i) => {
         const done = i < current
         const active = i === current
         return (
-          <li key={step.label} className="flex items-center gap-2">
+          <li key={step.label} className="flex items-center gap-1.5 sm:gap-2">
             {i > 0 && (
-              <span className={cn('h-px w-6 transition-colors duration-500 sm:w-10', done || active ? 'bg-accent' : 'bg-border')} />
+              <span className={cn('h-px w-3 transition-colors duration-500 min-[360px]:w-6 sm:w-10', done || active ? 'bg-accent' : 'bg-border')} />
             )}
             <span
               aria-current={active ? 'step' : undefined}
               className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-500',
+                'flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-colors min-[360px]:px-2.5 duration-500',
                 active && 'bg-accent text-accent-foreground',
                 done && 'bg-surface-success text-accent-ink',
                 !active && !done && 'text-muted-foreground'
@@ -78,7 +78,7 @@ export default function AuthLayout() {
         </div>
       </motion.header>
 
-      <main className="relative z-10 flex flex-1 items-start justify-center px-4 py-8 md:items-center md:py-12">
+      <main className="relative z-10 flex flex-1 items-start justify-center px-4 py-6 md:items-center md:py-12">
         {/* todo el proceso de acceso vive dentro de una misma tarjeta */}
         <motion.div
           className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border/80 bg-card/95 text-center shadow-2xl shadow-sidebar/10 backdrop-blur-sm md:max-w-lg"
@@ -87,7 +87,7 @@ export default function AuthLayout() {
           transition={{ duration: DUR.page, ease: EASE, delay: 0.1 }}
         >
           <div aria-hidden className="h-1.5 bg-gradient-to-r from-sidebar via-accent to-sidebar" />
-          <div className="px-6 pt-8 pb-9 sm:px-10 sm:pt-10 sm:pb-11">
+          <div className="px-5 pt-7 pb-8 sm:px-10 sm:pt-10 sm:pb-11">
             <StepIndicator pathname={location.pathname} />
             <AnimatePresence mode="wait">
               <motion.div

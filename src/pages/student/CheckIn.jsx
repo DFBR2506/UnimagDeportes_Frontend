@@ -57,21 +57,21 @@ export default function CheckIn() {
   const opensAt = failure?.details?.opensAt
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Check-in del espacio"
         subtitle="Confirma tu asistencia desde el enlace fijo del QR."
       />
 
       <motion.section
-        className="rounded-2xl border border-border bg-card p-7 shadow-xs md:p-9"
+        className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 md:p-9"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
       >
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1.5">
-            <h2 className="font-display text-2xl font-bold text-card-foreground">{spaceName}</h2>
+          <div className="min-w-0 space-y-1.5">
+            <h2 className="font-display text-xl font-bold sm:text-2xl text-card-foreground">{spaceName}</h2>
             {res ? (
               <>
                 <p className="text-muted-foreground">
@@ -103,7 +103,7 @@ export default function CheckIn() {
             {success ? (
               <motion.div
                 key="ok"
-                className="flex flex-col items-center gap-4 rounded-xl bg-success/10 px-6 py-10 text-center"
+                className="flex flex-col items-center gap-4 rounded-xl bg-success/10 px-4 py-8 text-center sm:px-6 sm:py-10"
                 initial={{ opacity: 0, scale: 0.92 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.8, ease: EASE }}
@@ -147,6 +147,7 @@ export default function CheckIn() {
                   </Alert>
                 )}
                 <SmoothButton
+                  className="max-sm:w-full"
                   color="accent"
                   loading={confirming}
                   onClick={confirm}

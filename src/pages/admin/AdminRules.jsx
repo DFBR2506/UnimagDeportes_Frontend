@@ -77,7 +77,7 @@ export default function AdminRules() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Configuración de reglas"
         subtitle="Edita los parámetros configurables. No hay cobros monetarios."
@@ -93,7 +93,7 @@ export default function AdminRules() {
       ) : (
         <>
           <motion.form
-            className="rounded-2xl border border-border bg-card p-7 shadow-xs md:p-9"
+            className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 md:p-9"
             onSubmit={save}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -127,7 +127,7 @@ export default function AdminRules() {
                 </Field>
               </motion.div>
 
-              <motion.div className="flex flex-wrap gap-3 pt-2" {...staggerChild}>
+              <motion.div className="flex flex-wrap gap-3 pt-2 max-sm:*:w-full" {...staggerChild}>
                 <SmoothButton
                   color="accent"
                   disabled={!changed}
@@ -155,7 +155,7 @@ export default function AdminRules() {
           </motion.form>
 
           <motion.section
-            className="rounded-2xl border border-border bg-card px-7 shadow-xs"
+            className="rounded-2xl border border-border bg-card px-5 shadow-xs sm:px-7"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: EASE, delay: 0.35 }}
@@ -171,7 +171,7 @@ export default function AdminRules() {
                   className="flex flex-col gap-1 py-3.5 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <dt className="text-sm text-muted-foreground">{label}</dt>
-                  <dd className="font-medium text-card-foreground">{value}</dd>
+                  <dd className="font-medium wrap-anywhere text-card-foreground">{value}</dd>
                 </div>
               ))}
             </dl>

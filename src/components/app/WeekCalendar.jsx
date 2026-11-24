@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { Plus } from 'lucide-react'
-import { formatHour, formatRange, todayISO } from '@/data/domain'
+import { formatDate, formatHour, formatRange, todayISO } from '@/data/domain'
 import { cn } from '@/lib/utils'
 
 const ROW = 52 // alto en px de una franja de 60 min
@@ -43,6 +43,7 @@ const DAY_NUM = (iso) => Number(iso.slice(8))
  * Vista semanal tipo Google Calendar. Las franjas ocupadas/bloqueadas/propias se
  * pintan como eventos; las libres se seleccionan con clic o arrastrando en un mismo día.
  * Con `readOnly` (panel del administrador) solo se consultan las ocupaciones.
+ * En móvil se ve un día a la vez, elegido en la tira de días.
  */
 export default function WeekCalendar({
   days,
@@ -61,6 +62,11 @@ export default function WeekCalendar({
   const today = todayISO()
   const hours = Array.from({ length: close - open }, (_, i) => open + i)
   const drag = useRef(null)
+  const pointer = useRef('mouse')
+  const [mobileDay, setMobileDay] = useState(
+    () => [selection?.date, today].find((d) => days.includes(d)) ?? days[0]
+  )
+  const activeDay = days.includes(mobileDay) ? mobileDay : days[0]
 
   useEffect(() => {
     const end = () => {
@@ -122,13 +128,58 @@ export default function WeekCalendar({
 
   const now = new Date()
   const nowOffset = (now.getHours() + now.getMinutes() / 60 - open) * ROW
-  const cols = `3.5rem repeat(${days.length}, minmax(5.25rem, 1fr))`
+  const cols = { '--cols': `3.5rem repeat(${days.length}, minmax(5.25rem, 1fr))` }
+  // señal de la tira móvil: franjas libres (estudiante) u ocupaciones (administrador)
+  const hasMark = (date) =>
+    readOnly ? slotMap[date].some((s) => s.estado !== 'libre') : hours.some((h) => isFree(date, h))
 
   return (
-    <div className="overflow-x-auto overscroll-x-contain">
-      <div className="min-w-[40rem] select-none">
+    <div className="md:overflow-x-auto md:overscroll-x-contain">
+      <div className="select-none md:min-w-[40rem]">
+        {/* tira de días (móvil) */}
+        <div className="mb-4 md:hidden">
+          <div aria-label="Día" className="grid grid-cols-7 gap-1" role="group">
+            {days.map((d) => {
+              const active = d === activeDay
+              return (
+                <button
+                  key={d}
+                  aria-label={formatDate(d)}
+                  aria-pressed={active}
+                  className={cn(
+                    'flex min-w-0 cursor-pointer flex-col items-center gap-0.5 rounded-xl py-2 transition-colors duration-300 focus-ring disabled:cursor-default disabled:opacity-40',
+                    active ? 'bg-sidebar text-white' : 'bg-muted/60 text-foreground'
+                  )}
+                  disabled={d > maxDate}
+                  onClick={() => setMobileDay(d)}
+                  type="button"
+                >
+                  <span
+                    className={cn(
+                      'text-[10px] font-medium uppercase',
+                      active ? 'text-white/75' : d === today ? 'text-accent-ink' : 'text-muted-foreground'
+                    )}
+                  >
+                    {SHORT_DAY(d)}
+                  </span>
+                  <span className="font-display text-base leading-tight font-semibold">{DAY_NUM(d)}</span>
+                  <span
+                    className={cn(
+                      'size-1.5 rounded-full',
+                      !hasMark(d) ? 'bg-transparent' : readOnly && !active ? 'bg-smooth-600' : 'bg-accent'
+                    )}
+                  />
+                </button>
+              )
+            })}
+          </div>
+          <p aria-live="polite" className="mt-3 text-sm font-medium text-foreground">
+            {activeDay === today ? `Hoy · ${formatDate(activeDay)}` : formatDate(activeDay)}
+          </p>
+        </div>
+
         {/* cabecera de días */}
-        <div className="grid border-b border-border" style={{ gridTemplateColumns: cols }}>
+        <div className="hidden grid-cols-(--cols) border-b border-border md:grid" style={cols}>
           <div className="pb-2 text-[10px] text-muted-foreground self-end pl-1">GMT-5</div>
           {days.map((d) => {
             const isToday = d === today
@@ -159,8 +210,11 @@ export default function WeekCalendar({
         {/* cuerpo */}
         <div
           aria-busy={loading}
-          className={cn('grid transition-opacity duration-300', loading && 'pointer-events-none opacity-50')}
-          style={{ gridTemplateColumns: cols }}
+          className={cn(
+            'grid grid-cols-[3.25rem_minmax(0,1fr)] transition-opacity duration-300 md:grid-cols-(--cols)',
+            loading && 'pointer-events-none opacity-50'
+          )}
+          style={cols}
         >
           <div className="relative" style={{ height: hours.length * ROW }}>
             {hours.map((h, i) =>
@@ -184,7 +238,11 @@ export default function WeekCalendar({
             return (
               <div
                 key={date}
-                className={cn('relative border-l border-border', out && 'bg-muted/60')}
+                className={cn(
+                  'relative border-l border-border',
+                  out && 'bg-muted/60',
+                  date !== activeDay && 'max-md:hidden'
+                )}
                 style={{ height: hours.length * ROW }}
               >
                 {/* celdas (franjas libres clicables) */}
@@ -201,9 +259,15 @@ export default function WeekCalendar({
                           : 'cursor-default'
                       )}
                       disabled={!free}
-                      onClick={(e) => e.detail === 0 && pick(date, h)}
+                      onClick={(e) => {
+                        // teclado o toque: con el dedo se elige al soltar, para poder desplazar la página
+                        if (e.detail !== 0 && pointer.current === 'mouse') return
+                        pick(date, h)
+                        drag.current = null
+                      }}
                       onPointerDown={(e) => {
-                        if (e.button !== 0) return
+                        pointer.current = e.pointerType
+                        if (e.button !== 0 || e.pointerType !== 'mouse') return
                         e.preventDefault()
                         pick(date, h)
                       }}
@@ -212,7 +276,7 @@ export default function WeekCalendar({
                       type="button"
                     >
                       {free && (
-                        <span className="pointer-events-none absolute inset-1 flex items-center justify-center gap-1 rounded-md text-[11px] font-medium text-accent-ink opacity-0 transition-opacity group-hover/cell:opacity-100">
+                        <span className="pointer-events-none absolute inset-1 flex items-center justify-center gap-1 rounded-md text-[11px] font-medium text-accent-ink opacity-0 transition-opacity group-hover/cell:opacity-100 pointer-coarse:opacity-60">
                           <Plus className="size-3" />
                           {formatHour(h).replace(':00', '')}
                         </span>

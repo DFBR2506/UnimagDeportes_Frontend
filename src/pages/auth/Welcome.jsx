@@ -35,18 +35,18 @@ export default function Welcome() {
   }
 
   return (
-    <motion.div className="space-y-8" {...staggerParent}>
+    <motion.div className="space-y-6 sm:space-y-8" {...staggerParent}>
       <motion.div className="space-y-3" {...staggerChild}>
         <img
           alt="Área Deportes · Unimagdalena – Bienestar Universitario"
-          className="mx-auto mb-4 size-24 drop-shadow-md sm:size-28"
+          className="mx-auto mb-4 size-20 min-[360px]:size-24 drop-shadow-md sm:size-28"
           draggable={false}
           src="/logo.svg"
         />
-        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground min-[360px]:text-3xl sm:text-4xl">
           Reserva tu espacio
         </h1>
-        <p className="text-lg text-muted-foreground">
+        <p className="text-base text-muted-foreground sm:text-lg">
           Actividad deportiva universitaria, en un solo lugar.
         </p>
         <p className="text-sm text-muted-foreground">

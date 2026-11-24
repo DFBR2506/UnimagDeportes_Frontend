@@ -82,9 +82,8 @@ function ContactForm({ onSent }) {
   )
 }
 
-/** Botón flotante (abajo a la derecha) que abre el formulario de contacto en un modal. */
-export default function ContactFab() {
-  const [open, setOpen] = useState(false)
+/** Botón flotante (abajo a la derecha) que abre el formulario de contacto en un modal; en móvil lo abre la barra inferior. */
+export default function ContactFab({ open, onOpenChange }) {
   const [hover, setHover] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -92,22 +91,22 @@ export default function ContactFab() {
   // Enlace de contacto de los correos (/app/contacto → inicio con el modal abierto).
   useEffect(() => {
     if (!location.state?.openContact) return
-    setOpen(true)
+    onOpenChange(true)
     navigate(location.pathname, { replace: true, state: null })
-  }, [location.state, location.pathname, navigate])
+  }, [location.state, location.pathname, navigate, onOpenChange])
   const expanded = hover && !open
 
   return (
     <>
       <motion.button
         aria-label="Contactar al administrador"
-        className="fixed right-5 bottom-5 z-40 flex h-14 cursor-pointer items-center overflow-hidden rounded-full bg-sidebar pr-4 pl-4 text-sidebar-foreground shadow-xl shadow-sidebar/25 ring-1 ring-white/10 focus-ring md:right-8 md:bottom-8"
+        className="fixed right-5 bottom-5 z-40 hidden h-14 cursor-pointer items-center overflow-hidden rounded-full bg-sidebar pr-4 pl-4 text-sidebar-foreground shadow-xl shadow-sidebar/25 ring-1 ring-white/10 focus-ring md:right-8 md:bottom-8 md:flex"
         initial={{ opacity: 0, scale: 0.6, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.7, ease: EASE, delay: 0.6 }}
         layout
         onBlur={() => setHover(false)}
-        onClick={() => setOpen(true)}
+        onClick={() => onOpenChange(true)}
         onFocus={() => setHover(true)}
         onHoverEnd={() => setHover(false)}
         onHoverStart={() => setHover(true)}
@@ -137,11 +136,11 @@ export default function ContactFab() {
       <Dialog
         className="sm:max-w-lg"
         description="Envía un mensaje al correo del área de deportes."
-        onOpenChange={setOpen}
+        onOpenChange={onOpenChange}
         open={open}
         title="Contactar administrador"
       >
-        <ContactForm onSent={() => setOpen(false)} />
+        <ContactForm onSent={() => onOpenChange(false)} />
       </Dialog>
     </>
   )

@@ -63,14 +63,14 @@ export default function Rules() {
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Reglas de uso"
         subtitle="Valores vigentes configurados para todas las personas."
       />
 
       <motion.section
-        className="rounded-2xl border border-border bg-card px-7 shadow-xs"
+        className="rounded-2xl border border-border bg-card px-5 shadow-xs sm:px-7"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
@@ -103,7 +103,7 @@ export default function Rules() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, ease: EASE, delay: 0.65 }}
         >
-          <AccordionRoot className="rounded-2xl border border-border bg-card px-5 shadow-xs">
+          <AccordionRoot className="rounded-2xl border border-border bg-card px-2 shadow-xs sm:px-5">
             {explain(settings).map(({ q, a }) => (
               <AccordionItem key={q} value={q}>
                 <AccordionHeader>

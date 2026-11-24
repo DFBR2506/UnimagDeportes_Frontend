@@ -104,7 +104,7 @@ export default function ConfirmReservation() {
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Confirma tu reserva"
         subtitle="La reserva queda a nombre de la persona autenticada y no es transferible."
@@ -113,7 +113,7 @@ export default function ConfirmReservation() {
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <motion.section
-            className="rounded-2xl border border-border bg-card p-7 shadow-xs"
+            className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
@@ -128,8 +128,8 @@ export default function ConfirmReservation() {
                   className="flex items-center justify-between gap-4 py-3.5"
                   {...staggerChild}
                 >
-                  <dt className="text-sm text-muted-foreground">{label}</dt>
-                  <dd className="font-medium text-card-foreground">{value}</dd>
+                  <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+                  <dd className="text-right font-medium text-card-foreground">{value}</dd>
                 </motion.div>
               ))}
             </motion.dl>
@@ -137,7 +137,7 @@ export default function ConfirmReservation() {
 
           {/* UC13: implementos opcionales, según stock libre en la franja (RN-65) */}
           <motion.section
-            className="rounded-2xl border border-border bg-card p-7 shadow-xs"
+            className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: EASE, delay: 0.3 }}
@@ -159,7 +159,7 @@ export default function ConfirmReservation() {
               <ul className="mt-4 divide-y divide-border">
                 {equipment.map((item) => (
                   <li key={item.equipmentId} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-card-foreground">{item.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {item.available} disponible{item.available === 1 ? '' : 's'} en esta franja
@@ -184,7 +184,7 @@ export default function ConfirmReservation() {
 
         <div className="space-y-5">
           <motion.section
-            className="rounded-2xl border border-border bg-card p-6 shadow-xs"
+            className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: EASE, delay: 0.35 }}
@@ -206,7 +206,7 @@ export default function ConfirmReservation() {
           </motion.section>
 
           <motion.section
-            className="rounded-2xl border border-border bg-card p-6 shadow-xs"
+            className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: EASE, delay: 0.5 }}
@@ -254,7 +254,7 @@ export default function ConfirmReservation() {
       )}
 
       <motion.div
-        className="flex flex-wrap gap-3"
+        className="flex flex-wrap gap-3 max-sm:*:w-full"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: EASE, delay: 0.7 }}
