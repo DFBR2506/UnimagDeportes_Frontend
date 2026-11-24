@@ -82,7 +82,7 @@ function ImagePicker({ label, hint, file, onChange, required, current, wide, pan
           </span>
         )}
         {preview && (
-          <span className="absolute inset-x-2 bottom-2 rounded-md bg-sidebar/80 px-2 py-1 text-center text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="absolute inset-x-2 bottom-2 rounded-md bg-sidebar/80 px-2 py-1 text-center text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100">
             Cambiar imagen
           </span>
         )}
@@ -229,7 +229,7 @@ export default function AdminSpaces() {
     fieldErrors[key] ? <p className="text-xs text-destructive-ink">{fieldErrors[key]}</p> : null
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Espacios"
         subtitle="Administra espacios, horarios de operación, estados e imágenes."
@@ -241,7 +241,7 @@ export default function AdminSpaces() {
       />
 
       <motion.div
-        className="max-w-sm"
+        className="sm:max-w-sm"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
@@ -276,63 +276,95 @@ export default function AdminSpaces() {
             title="Aún no hay espacios"
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
-                  <th className="px-6 py-4 font-medium">Nombre</th>
-                  <th className="px-6 py-4 font-medium">Disciplina(s)</th>
-                  <th className="px-6 py-4 font-medium">Aforo</th>
-                  <th className="px-6 py-4 font-medium">Horario</th>
-                  <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <motion.tbody {...staggerParent}>
-                {visible.map((space) => (
-                  <motion.tr
-                    key={space.id}
-                    className="border-b border-border/60 last:border-0"
-                    {...staggerChild}
-                  >
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <SpaceThumb space={space} version={imageVersion} />
-                        <span className="font-medium text-card-foreground">{space.name}</span>
+          <>
+            {/* móvil y tableta: una tarjeta por espacio en vez de la tabla */}
+            <motion.ul className="divide-y divide-border/60 lg:hidden" {...staggerParent}>
+              {visible.map((space) => (
+                <motion.li key={space.id} className="space-y-3 p-4 sm:p-5" {...staggerChild}>
+                  <div className="flex gap-3">
+                    <SpaceThumb space={space} version={imageVersion} />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                        <p className="font-medium text-card-foreground">{space.name}</p>
+                        <Badge variant={space.estado === 'activo' ? 'success' : 'warning'}>
+                          {space.estado === 'activo' ? 'Activo' : 'Mantenimiento'}
+                        </Badge>
                       </div>
-                    </td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {space.disciplines.map(disciplineName).join(', ')}
-                    </td>
-                    <td className="px-6 py-3 text-muted-foreground tabular-nums">{space.aforo}</td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {formatHour(space.open)}–{formatHour(space.close)}
-                    </td>
-                    <td className="px-6 py-3">
-                      <Badge variant={space.estado === 'activo' ? 'success' : 'warning'}>
-                        {space.estado === 'activo' ? 'Activo' : 'Mantenimiento'}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <SmoothButton onClick={() => setViewSpace(space)} prefix={<Rotate3d />} size="sm" variant="soft">
-                          Ver 360°
-                        </SmoothButton>
-                        <SmoothButton
-                          onClick={() => openEdit(space)}
-                          prefix={<Pencil />}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Editar
-                        </SmoothButton>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </motion.tbody>
-            </table>
-          </div>
+                      <p className="text-sm text-muted-foreground">{space.disciplines.map(disciplineName).join(', ')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatHour(space.open)}–{formatHour(space.close)} · Aforo {space.aforo}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <SmoothButton onClick={() => setViewSpace(space)} prefix={<Rotate3d />} size="sm" variant="soft">
+                      Ver 360°
+                    </SmoothButton>
+                    <SmoothButton onClick={() => openEdit(space)} prefix={<Pencil />} size="sm" variant="outline">
+                      Editar
+                    </SmoothButton>
+                  </div>
+                </motion.li>
+              ))}
+            </motion.ul>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
+                    <th className="px-6 py-4 font-medium">Nombre</th>
+                    <th className="px-6 py-4 font-medium">Disciplina(s)</th>
+                    <th className="px-6 py-4 font-medium">Aforo</th>
+                    <th className="px-6 py-4 font-medium">Horario</th>
+                    <th className="px-6 py-4 font-medium">Estado</th>
+                    <th className="px-6 py-4 font-medium">Acciones</th>
+                  </tr>
+                </thead>
+                <motion.tbody {...staggerParent}>
+                  {visible.map((space) => (
+                    <motion.tr
+                      key={space.id}
+                      className="border-b border-border/60 last:border-0"
+                      {...staggerChild}
+                    >
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3">
+                          <SpaceThumb space={space} version={imageVersion} />
+                          <span className="font-medium text-card-foreground">{space.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-muted-foreground">
+                        {space.disciplines.map(disciplineName).join(', ')}
+                      </td>
+                      <td className="px-6 py-3 text-muted-foreground tabular-nums">{space.aforo}</td>
+                      <td className="px-6 py-3 text-muted-foreground">
+                        {formatHour(space.open)}–{formatHour(space.close)}
+                      </td>
+                      <td className="px-6 py-3">
+                        <Badge variant={space.estado === 'activo' ? 'success' : 'warning'}>
+                          {space.estado === 'activo' ? 'Activo' : 'Mantenimiento'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <SmoothButton onClick={() => setViewSpace(space)} prefix={<Rotate3d />} size="sm" variant="soft">
+                            Ver 360°
+                          </SmoothButton>
+                          <SmoothButton
+                            onClick={() => openEdit(space)}
+                            prefix={<Pencil />}
+                            size="sm"
+                            variant="outline"
+                          >
+                            Editar
+                          </SmoothButton>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </motion.tbody>
+              </table>
+            </div>
+          </>
         )}
       </motion.section>
 
@@ -340,7 +372,7 @@ export default function AdminSpaces() {
         className="sm:max-w-2xl"
         description="RN-09: un espacio en mantenimiento no aparece como reservable. Los cambios rigen para reservas nuevas."
         footer={
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <SmoothButton onClick={() => setOpen(false)} variant="outline">
               Cancelar
             </SmoothButton>
@@ -359,7 +391,7 @@ export default function AdminSpaces() {
         open={open}
         title={form.id ? 'Editar espacio' : 'Crear espacio'}
       >
-        <div className="max-h-[65dvh] space-y-5 overflow-y-auto py-2 pr-1">
+        <div className="max-h-[46dvh] space-y-5 sm:max-h-[65dvh] overflow-y-auto py-2 pr-1">
           <Field>
             <FieldLabel>Nombre</FieldLabel>
             <Input
@@ -374,7 +406,7 @@ export default function AdminSpaces() {
             <p className="mb-2 text-sm font-medium">Disciplinas</p>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               {DISCIPLINES.map((d) => (
-                <label className="flex items-center gap-2 text-sm" key={d.id}>
+                <label className="flex items-center gap-2 text-sm pointer-coarse:min-h-9" key={d.id}>
                   <Checkbox
                     checked={form.disciplines.includes(d.id)}
                     onCheckedChange={(checked) => toggleDiscipline(d.id, checked)}
@@ -386,7 +418,7 @@ export default function AdminSpaces() {
             {fieldError('disciplines')}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 min-[400px]:grid-cols-2">
             <Field>
               <FieldLabel>Aforo máximo</FieldLabel>
               <NumberField
@@ -499,7 +531,7 @@ export default function AdminSpaces() {
         open={Boolean(viewSpace)}
         title={`Vista 360° · ${viewSpace?.name ?? 'Cancha'}`}
       >
-        {viewSpace && <SpacePanorama className="aspect-[4/3] max-h-[65dvh] w-full sm:aspect-video" space={viewSpace} />}
+        {viewSpace && <SpacePanorama className="aspect-square max-h-[65dvh] w-full sm:aspect-video" space={viewSpace} />}
       </Dialog>
     </div>
   )

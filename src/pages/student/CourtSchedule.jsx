@@ -41,7 +41,7 @@ const monthLabel = (days) => {
 
 function SelectionPanel({ className, selection, disciplineName, settings, blocked, onContinue, onClear }) {
   return (
-    <div className={cn('rounded-2xl border border-border bg-card p-5 shadow-xs', className)}>
+    <div className={cn('rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5', className)}>
       <AnimatePresence initial={false} mode="wait">
         {selection ? (
           <motion.div
@@ -65,14 +65,16 @@ function SelectionPanel({ className, selection, disciplineName, settings, blocke
             </div>
             <div className="flex flex-wrap gap-2">
               <SmoothButton
-                className="flex-1"
+                className="flex-1 max-sm:px-3"
                 color="accent"
                 disabled={blocked}
                 onClick={onContinue}
                 suffix={<ArrowRight />}
                 variant="candy"
               >
-                Continuar con la reserva
+                <span>
+                  Continuar<span className="max-sm:hidden"> con la reserva</span>
+                </span>
               </SmoothButton>
               <SmoothButton onClick={onClear} variant="outline">
                 Quitar
@@ -88,7 +90,10 @@ function SelectionPanel({ className, selection, disciplineName, settings, blocke
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            Haz clic en una franja libre del calendario, o arrastra para elegir hasta{' '}
+            <span className="md:hidden">Toca una franja libre; toca la siguiente para elegir hasta </span>
+            <span className="max-md:hidden">
+              Haz clic en una franja libre del calendario, o arrastra para elegir hasta{' '}
+            </span>
             {settings.maxFranjas} franjas consecutivas. Tolerancia de {settings.toleranciaMin} min tras el
             inicio.
           </motion.p>
@@ -220,13 +225,13 @@ export default function CourtSchedule() {
       >
         <div className="space-y-2">
           <button
-            className="flex cursor-pointer items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-ring"
+            className="flex cursor-pointer items-center gap-1.5 rounded-md text-sm font-medium pointer-coarse:min-h-10 text-muted-foreground transition-colors hover:text-foreground focus-ring"
             onClick={() => navigate('/app/disponibilidad')}
             type="button"
           >
             <ArrowLeft className="size-4" /> Todas las canchas
           </button>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
             {space.name}
           </h1>
           <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
@@ -279,7 +284,7 @@ export default function CourtSchedule() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}
         >
-          <div className="mb-5 flex flex-wrap items-center gap-3">
+          <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-3 sm:gap-3">
             <SmoothButton disabled={week === 0} onClick={() => setWeek(0)} size="sm" variant="outline">
               Hoy
             </SmoothButton>
@@ -303,7 +308,7 @@ export default function CourtSchedule() {
                 <ChevronRight />
               </SmoothButton>
             </div>
-            <h2 className="font-display text-lg font-semibold text-card-foreground">{monthLabel(days)}</h2>
+            <h2 className="font-display text-base font-semibold text-card-foreground sm:text-lg">{monthLabel(days)}</h2>
             <p className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
               {loading ? (
                 <Spinner aria-label="Actualizando" size="sm" />
@@ -364,8 +369,14 @@ export default function CourtSchedule() {
             ))}
           </ul>
 
-          {/* en móvil el panel queda pegado bajo el calendario para no perderlo de vista */}
-          <SelectionPanel className="sticky bottom-3 z-30 mt-4 shadow-lg lg:hidden" {...panelProps} />
+          {/* en móvil, con una franja elegida, el panel queda pegado sobre la barra inferior para no perderlo de vista */}
+          <SelectionPanel
+            className={cn(
+              'mt-4 lg:hidden',
+              selection && 'sticky bottom-[calc(var(--bottom-bar-space)+0.5rem)] z-30 shadow-lg md:bottom-3'
+            )}
+            {...panelProps}
+          />
         </motion.section>
 
         <motion.aside

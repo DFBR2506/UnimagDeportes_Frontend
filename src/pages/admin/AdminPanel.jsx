@@ -106,16 +106,16 @@ function Indicators() {
       {error ? (
         <p className="text-sm text-destructive-ink">{errorMessage(error)}</p>
       ) : (
-        <motion.div className="grid grid-cols-2 gap-4 lg:grid-cols-4" {...staggerParent}>
+        <motion.div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" {...staggerParent}>
           {(data ? kpis : [0, 1, 2, 3]).map((k, i) =>
             data ? (
               <motion.div
                 key={k.label}
-                className="rounded-2xl border border-border bg-card p-5 shadow-xs"
+                className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5"
                 {...staggerChild}
               >
                 <p className="text-sm text-muted-foreground">{k.label}</p>
-                <p className="mt-2 font-display text-4xl font-bold text-foreground">
+                <p className="mt-2 font-display text-3xl font-bold sm:text-4xl text-foreground">
                   <AnimatedNumber value={k.value} />
                 </p>
               </motion.div>
@@ -229,7 +229,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Panel de ocupación"
         subtitle="Revisa todas las reservas y bloqueos de cada cancha, semana a semana."
@@ -239,7 +239,7 @@ export default function AdminPanel() {
 
       {/* selector de cancha y semana */}
       <motion.section
-        className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-xs md:flex-row md:items-end md:p-6"
+        className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5 md:flex-row md:items-end md:p-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}
@@ -296,11 +296,11 @@ export default function AdminPanel() {
         </Field>
       </motion.section>
 
-      <motion.div className="grid grid-cols-2 gap-4 lg:grid-cols-4" {...staggerParent}>
+      <motion.div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" {...staggerParent}>
         {stats.map(({ label, value, suffix }) => (
           <motion.div
             key={label}
-            className="rounded-2xl border border-border bg-surface-info/60 p-5 shadow-xs"
+            className="rounded-2xl border border-border bg-surface-info/60 p-4 shadow-xs sm:p-5"
             {...staggerChild}
           >
             <p className="text-sm text-muted-foreground">{label}</p>

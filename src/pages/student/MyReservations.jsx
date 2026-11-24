@@ -15,7 +15,7 @@ import { useApp } from '@/store'
 function ReservationCard({ res, onCancel }) {
   const isToday = res.date === todayISO()
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-xs">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-xs sm:p-5">
       <div className="min-w-0 space-y-1">
         <p className="font-display font-semibold text-card-foreground">{res.spaceName}</p>
         <p className="text-sm text-muted-foreground">
@@ -23,12 +23,12 @@ function ReservationCard({ res, onCancel }) {
         </p>
         {res.equipment.length > 0 && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Dumbbell className="size-3.5" />
+            <Dumbbell className="size-3.5 shrink-0" />
             {res.equipment.map((e) => `${e.quantity} × ${e.name}`).join(' · ')}
           </p>
         )}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
         <ReservationBadge estado={res.estado} />
         {res.estado === 'confirmada' && (
           <SmoothButton color="destructive" onClick={() => onCancel(res)} size="sm" variant="soft">
@@ -80,7 +80,7 @@ export default function MyReservations() {
   const checkable = upcoming.find((r) => r.date === today)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader title="Mis reservas" subtitle="Solo ves reservas creadas por ti." />
 
       <motion.div
@@ -116,7 +116,7 @@ export default function MyReservations() {
 
       {checkable && (
         <motion.section
-          className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-sidebar p-6 text-sidebar-foreground shadow-lg"
+          className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-sidebar p-5 text-sidebar-foreground sm:p-6 shadow-lg"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, ease: EASE, delay: 0.5 }}
@@ -128,6 +128,7 @@ export default function MyReservations() {
             </p>
           </div>
           <SmoothButton
+            className="w-full sm:w-auto"
             color="amber"
             onClick={() => navigate(`/checkin/${checkable.spaceId}`)}
             prefix={<QrCode />}

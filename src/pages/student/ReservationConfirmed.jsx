@@ -23,7 +23,7 @@ export default function ReservationConfirmed() {
   if (!res) return <Navigate to="/app/mis-reservas" replace />
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader title="Reserva confirmada" subtitle="Tu espacio quedó reservado de inmediato." />
 
       <motion.section
@@ -33,7 +33,7 @@ export default function ReservationConfirmed() {
         transition={{ duration: 1, ease: EASE, delay: 0.2 }}
       >
         <div className="h-1.5 bg-gradient-to-r from-sidebar via-accent to-sidebar" />
-        <motion.div className="space-y-5 p-7 md:p-9" {...staggerParent}>
+        <motion.div className="space-y-5 p-5 sm:p-7 md:p-9" {...staggerParent}>
           <motion.div className="flex items-center gap-3" {...staggerChild}>
             <motion.span
               className="flex size-12 items-center justify-center rounded-full bg-success/15 text-success"
@@ -47,7 +47,7 @@ export default function ReservationConfirmed() {
           </motion.div>
 
           <motion.div className="space-y-1.5" {...staggerChild}>
-            <h2 className="font-display text-3xl font-bold text-card-foreground">{res.spaceName}</h2>
+            <h2 className="font-display text-2xl font-bold sm:text-3xl text-card-foreground">{res.spaceName}</h2>
             <p className="text-muted-foreground">
               {discipline ? `${discipline.name} · ` : ''}
               {formatDate(res.date)} · {formatRange(res.startHour, res.hours)}
@@ -80,7 +80,7 @@ export default function ReservationConfirmed() {
       </motion.section>
 
       <motion.div
-        className="flex flex-wrap gap-3"
+        className="flex flex-wrap gap-3 max-sm:*:w-full"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: EASE, delay: 0.9 }}

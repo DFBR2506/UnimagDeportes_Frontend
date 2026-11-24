@@ -79,7 +79,7 @@ export default function AdminEquipment() {
   const valid = form.name.trim() && Number(form.stock) >= 0
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Implementos"
         subtitle="Balones, mallas y demás elementos que se pueden pedir al reservar."
@@ -111,47 +111,75 @@ export default function AdminEquipment() {
             title="Sin implementos"
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
-                  <th className="px-6 py-4 font-medium">Nombre</th>
-                  <th className="px-6 py-4 font-medium">Disciplina sugerida</th>
-                  <th className="px-6 py-4 font-medium">Stock</th>
-                  <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <motion.tbody {...staggerParent}>
-                {items.map((item) => (
-                  <motion.tr key={item.id} className="border-b border-border/60 last:border-0" {...staggerChild}>
-                    <td className="px-6 py-4 font-medium text-card-foreground">{item.name}</td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {item.discipline ? disciplineName(item.discipline) : '—'}
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground tabular-nums">{item.stock}</td>
-                    <td className="px-6 py-4">
-                      <Badge variant={item.status === 'AVAILABLE' ? 'success' : 'secondary'}>
-                        {item.status === 'AVAILABLE' ? 'Disponible' : 'Inactivo'}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <SmoothButton onClick={() => openEdit(item)} prefix={<Pencil />} size="sm" variant="outline">
-                        Editar
-                      </SmoothButton>
-                    </td>
-                  </motion.tr>
-                ))}
-              </motion.tbody>
-            </table>
-          </div>
+          <>
+            {/* móvil: una tarjeta por implemento en vez de la tabla */}
+            <motion.ul className="divide-y divide-border/60 md:hidden" {...staggerParent}>
+              {items.map((item) => (
+                <motion.li key={item.id} className="flex items-center justify-between gap-3 p-4" {...staggerChild}>
+                  <div className="min-w-0 space-y-1.5">
+                    <p className="font-medium text-card-foreground">{item.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.discipline ? `${disciplineName(item.discipline)} · ` : ''}
+                      <span className="tabular-nums">{item.stock}</span> en stock
+                    </p>
+                    <Badge variant={item.status === 'AVAILABLE' ? 'success' : 'secondary'}>
+                      {item.status === 'AVAILABLE' ? 'Disponible' : 'Inactivo'}
+                    </Badge>
+                  </div>
+                  <SmoothButton
+                    aria-label={`Editar ${item.name}`}
+                    className="shrink-0"
+                    onClick={() => openEdit(item)}
+                    size="icon"
+                    variant="outline"
+                  >
+                    <Pencil />
+                  </SmoothButton>
+                </motion.li>
+              ))}
+            </motion.ul>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
+                    <th className="px-6 py-4 font-medium">Nombre</th>
+                    <th className="px-6 py-4 font-medium">Disciplina sugerida</th>
+                    <th className="px-6 py-4 font-medium">Stock</th>
+                    <th className="px-6 py-4 font-medium">Estado</th>
+                    <th className="px-6 py-4 font-medium">Acciones</th>
+                  </tr>
+                </thead>
+                <motion.tbody {...staggerParent}>
+                  {items.map((item) => (
+                    <motion.tr key={item.id} className="border-b border-border/60 last:border-0" {...staggerChild}>
+                      <td className="px-6 py-4 font-medium text-card-foreground">{item.name}</td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {item.discipline ? disciplineName(item.discipline) : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground tabular-nums">{item.stock}</td>
+                      <td className="px-6 py-4">
+                        <Badge variant={item.status === 'AVAILABLE' ? 'success' : 'secondary'}>
+                          {item.status === 'AVAILABLE' ? 'Disponible' : 'Inactivo'}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <SmoothButton onClick={() => openEdit(item)} prefix={<Pencil />} size="sm" variant="outline">
+                          Editar
+                        </SmoothButton>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </motion.tbody>
+              </table>
+            </div>
+          </>
         )}
       </motion.section>
 
       <Dialog
         description="El stock no puede quedar por debajo de las unidades ya comprometidas en reservas futuras (RN-65)."
         footer={
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <SmoothButton onClick={() => setOpen(false)} variant="outline">
               Cancelar
             </SmoothButton>
@@ -174,7 +202,7 @@ export default function AdminEquipment() {
               value={form.name}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 min-[400px]:grid-cols-2">
             <Field>
               <FieldLabel>Stock total</FieldLabel>
               <NumberField
