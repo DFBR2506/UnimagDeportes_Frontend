@@ -57,7 +57,7 @@ export default function AdminQR() {
   const fileName = `qr-${(space?.name ?? 'espacio').toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.svg`
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PrintSheet name={space?.name} qrUrl={ready ? qr.url : null} />
       <PageHeader
         title="Generar QR del espacio"
@@ -66,12 +66,12 @@ export default function AdminQR() {
 
       <div className="grid gap-5 lg:grid-cols-5">
         <motion.section
-          className="rounded-2xl border border-border bg-card p-7 shadow-xs lg:col-span-3"
+          className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 lg:col-span-3"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
         >
-          <div className="max-w-xs">
+          <div className="sm:max-w-xs">
             <Field>
               <FieldLabel>Espacio</FieldLabel>
               <Select
@@ -86,8 +86,8 @@ export default function AdminQR() {
 
           {space && (
             <>
-              <h2 className="mt-6 font-display text-2xl font-bold text-card-foreground">{space.name}</h2>
-              <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <h2 className="mt-6 font-display text-xl font-bold sm:text-2xl text-card-foreground">{space.name}</h2>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                 Enlace:{' '}
                 <Link
                   className="inline-flex items-center gap-1 font-medium text-accent-ink hover:underline"
@@ -100,8 +100,8 @@ export default function AdminQR() {
             </>
           )}
 
-          <div className="mt-6 w-fit rounded-2xl border border-border bg-white p-6 shadow-xs">
-            <div className="size-52 md:size-60">
+          <div className="mx-auto mt-6 w-full max-w-72 rounded-2xl border border-border bg-white p-5 sm:mx-0 sm:w-fit sm:max-w-none sm:p-6 shadow-xs">
+            <div className="aspect-square w-full sm:size-52 md:size-60">
               {ready && qr.url ? (
                 <motion.img
                   key={qr.url}
@@ -138,7 +138,7 @@ export default function AdminQR() {
         </motion.section>
 
         <motion.section
-          className="h-fit rounded-2xl bg-sidebar p-7 text-sidebar-foreground shadow-lg lg:col-span-2"
+          className="h-fit rounded-2xl bg-sidebar p-5 text-sidebar-foreground shadow-lg sm:p-7 lg:col-span-2"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, ease: EASE, delay: 0.4 }}
@@ -149,7 +149,7 @@ export default function AdminQR() {
             check-in. Imprime el código y fíjalo en la entrada del espacio; es estático y siempre lleva al
             mismo enlace.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3 max-sm:*:w-full">
             <SmoothButton
               color="amber"
               disabled={!ready || !qr.url}

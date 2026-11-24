@@ -147,7 +147,7 @@ export default function Court360({ kind = 'multiple', name, imageUrl, status = '
             <Compass className="size-3.5" style={{ transform: `rotate(${-heading}deg)` }} />
             {heading}°
           </div>
-          <div className="absolute inset-x-3 bottom-3 z-10 flex flex-wrap justify-center gap-2">
+          <div className="absolute inset-x-2 bottom-3 z-10 flex flex-wrap justify-center gap-1.5 sm:inset-x-3 sm:gap-2">
             {CONTROLS.map(({ action, label, icon }) => {
               const controlLabel = action === 'auto' && auto ? 'Pausar giro' : label
               const Icon = action === 'auto' && auto ? Pause : icon
@@ -170,7 +170,7 @@ export default function Court360({ kind = 'multiple', name, imageUrl, status = '
           </p>
         </>
       ) : (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 pt-12 pb-5 text-center text-white" role="status">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 pt-12 pb-3 text-center sm:gap-3 sm:px-6 sm:pb-5 text-white" role="status">
           {loading ? (
             <>
               <Spinner aria-label="Cargando panorama" />
@@ -182,7 +182,7 @@ export default function Court360({ kind = 'multiple', name, imageUrl, status = '
               <p className="max-w-sm text-xs leading-relaxed text-white/80">
                 {(viewerFailed ? view.message : error?.message) || 'Todavía no hay una imagen panorámica para esta cancha.'}
               </p>
-              <p className="text-[11px] text-white/65">Ilustración 2D de referencia</p>
+              <p className="text-[11px] text-white/65 max-sm:hidden">Ilustración 2D de referencia</p>
               {(onRetry || viewerFailed) && (
                 <button className="flex cursor-pointer items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-medium hover:bg-white/25 focus-ring" onClick={retry} type="button">
                   <RefreshCw className="size-3.5" /> Volver a intentar

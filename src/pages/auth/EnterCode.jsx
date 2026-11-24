@@ -72,9 +72,9 @@ export default function EnterCode() {
   }
 
   return (
-    <motion.div className="space-y-8" {...staggerParent}>
+    <motion.div className="space-y-6 sm:space-y-8" {...staggerParent}>
       <motion.div className="space-y-3" {...staggerChild}>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground min-[360px]:text-3xl sm:text-4xl">
           Ingresa tu código
         </h1>
         <p className="text-muted-foreground">
@@ -105,7 +105,7 @@ export default function EnterCode() {
 
       <motion.div className="space-y-3" {...staggerChild}>
         <SmoothButton
-          className="w-full"
+          className="w-full max-sm:px-4"
           color="accent"
           disabled={code.length !== 6}
           loading={validating}
@@ -117,7 +117,7 @@ export default function EnterCode() {
           Validar código
         </SmoothButton>
         <SmoothButton
-          className="w-full"
+          className="w-full max-sm:px-4"
           color="accent"
           disabled={resendIn > 0}
           onClick={resend}

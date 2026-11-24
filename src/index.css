@@ -81,6 +81,8 @@
   --brand-lighter: #c6e4b1;
   --brand-secondary: #57a326;
   --on-brand: #03294f;
+  /* alto de la barra inferior móvil (Shell) con el área segura */
+  --bottom-bar-space: calc(4rem + env(safe-area-inset-bottom, 0px));
 }
 
 .dark {
@@ -321,6 +323,8 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    /* viewport-fit=cover: en horizontal el contenido no queda bajo el notch */
+    padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
   }
   h1, h2, h3 {
     @apply font-display;

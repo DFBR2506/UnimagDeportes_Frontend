@@ -48,7 +48,7 @@ export default function Home() {
   ]
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 md:space-y-10">
       <PageHeader
         title={`Hola, ${firstName}`}
         subtitle="Tu actividad deportiva universitaria, en un solo lugar."
@@ -63,7 +63,7 @@ export default function Home() {
 
       <motion.div className="grid gap-5 lg:grid-cols-5" {...staggerParent}>
         <motion.section
-          className="relative overflow-hidden rounded-2xl bg-sidebar p-7 text-sidebar-foreground shadow-lg lg:col-span-3"
+          className="relative overflow-hidden rounded-2xl bg-sidebar p-5 text-sidebar-foreground shadow-lg sm:p-7 lg:col-span-3"
           {...staggerChild}
         >
           <motion.div
@@ -73,11 +73,12 @@ export default function Home() {
             transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
           />
           <div className="relative space-y-4">
-            <h2 className="font-display text-2xl font-semibold">Reserva tu próximo espacio</h2>
+            <h2 className="font-display text-xl font-semibold sm:text-2xl">Reserva tu próximo espacio</h2>
             <p className="text-sm text-sidebar-foreground/75">
               Consulta franjas libres y confirma en segundos.
             </p>
             <SmoothButton
+              className="w-full sm:w-auto"
               color="amber"
               onClick={() => navigate('/app/disponibilidad')}
               suffix={<ArrowRight />}
@@ -89,7 +90,7 @@ export default function Home() {
         </motion.section>
 
         <motion.section
-          className="rounded-2xl border border-border bg-card p-7 shadow-xs lg:col-span-2"
+          className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 lg:col-span-2"
           {...staggerChild}
         >
           <h2 className="font-display text-lg font-semibold text-card-foreground">
@@ -131,7 +132,7 @@ export default function Home() {
           {quickLinks.map(({ to, icon: Icon, title, text }) => (
             <motion.div key={title} {...staggerChild}>
               <Link
-                className="group flex items-center gap-4 rounded-xl border border-border bg-card p-5 shadow-xs transition-colors duration-300 hover:border-accent/40 hover:bg-accent/5 focus-ring"
+                className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 sm:gap-4 sm:p-5 shadow-xs transition-colors duration-300 hover:border-accent/40 hover:bg-accent/5 focus-ring"
                 to={to}
               >
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent-ink">
@@ -139,7 +140,7 @@ export default function Home() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-card-foreground">{title}</span>
-                  <span className="block truncate text-sm text-muted-foreground">{text}</span>
+                  <span className="block text-sm text-muted-foreground sm:truncate">{text}</span>
                 </span>
                 <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent-ink" />
               </Link>

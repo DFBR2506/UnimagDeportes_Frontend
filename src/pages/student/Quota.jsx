@@ -36,20 +36,20 @@ export default function Quota() {
     .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Mi cuota semanal"
         subtitle="La semana inicia el lunes a las 00:00 · America/Bogota."
       />
 
       <motion.section
-        className="rounded-2xl border border-border bg-card p-7 shadow-xs md:p-9"
+        className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-7 md:p-9"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
       >
         <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-card-foreground">
-          <CalendarRange className="size-5 text-accent-ink" />
+          <CalendarRange className="size-5 shrink-0 text-accent-ink" />
           Semana del {formatDate(monday, { weekday: undefined })} al{' '}
           {formatDate(sunday, { weekday: undefined })}
         </h2>
@@ -58,14 +58,14 @@ export default function Quota() {
           <>
             <div className="mt-7 grid grid-cols-2 gap-6 md:max-w-md">
               <div>
-                <p className="font-display text-5xl font-bold text-foreground">
+                <p className="font-display text-4xl sm:text-5xl font-bold text-foreground">
                   <AnimatedNumber value={quota.used} />
                   <span className="text-2xl"> h</span>
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">usadas</p>
               </div>
               <div>
-                <p className="font-display text-5xl font-bold text-accent-ink">
+                <p className="font-display text-4xl sm:text-5xl font-bold text-accent-ink">
                   <AnimatedNumber value={quota.left} />
                   <span className="text-2xl"> h</span>
                 </p>
@@ -88,7 +88,7 @@ export default function Quota() {
           </>
         ) : (
           <div className="mt-7 space-y-4">
-            <Skeleton className="h-14 w-64" />
+            <Skeleton className="h-14 w-64 max-w-full" />
             <Skeleton className="h-3 w-full" />
           </div>
         )}
@@ -117,7 +117,7 @@ export default function Quota() {
             {weekReservations.map((r) => (
               <motion.li
                 key={r.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-xs"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 shadow-xs sm:px-5"
                 {...staggerChild}
               >
                 <div className="min-w-0">
@@ -126,7 +126,7 @@ export default function Quota() {
                     {formatDate(r.date)} · {formatRange(r.startHour, r.hours)}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
                   <ReservationBadge estado={r.estado} />
                   <span className="text-sm font-medium tabular-nums text-foreground">
                     {COUNTS_FOR_QUOTA.includes(r.estado) ? `${r.hours} h` : '0 h'}

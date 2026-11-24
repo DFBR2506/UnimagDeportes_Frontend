@@ -70,7 +70,7 @@ export interface AlertDialogProps {
 const STAGGER_DELAY = 0.06;
 
 const PANEL_CLASS =
-  "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg sm:max-w-lg";
+  "fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto overscroll-contain -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg sm:max-w-lg";
 
 const ACTION_CLASS =
   "inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
@@ -87,7 +87,7 @@ export const DialogHeader = ({
   ...props
 }: ComponentProps<"div">) => (
   <div
-    className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+    className={cn("flex flex-col gap-2 text-center max-sm:px-5 sm:text-left", className)}
     data-slot="dialog-header"
     {...props}
   />

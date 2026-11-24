@@ -18,14 +18,14 @@ export default function Conflict() {
   const code = state?.code ?? 'SLOT_TAKEN'
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="La franja ya no está disponible"
         subtitle="Actualiza el calendario y elige otra franja para continuar."
       />
 
       <motion.section
-        className="flex flex-col items-start gap-4 rounded-2xl border border-warning/40 bg-warning/10 p-7 md:flex-row md:items-center"
+        className="flex flex-col items-start gap-4 rounded-2xl border border-warning/40 bg-warning/10 p-5 sm:p-7 md:flex-row md:items-center"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
@@ -55,6 +55,7 @@ export default function Conflict() {
         transition={{ duration: 0.8, ease: EASE, delay: 0.6 }}
       >
         <SmoothButton
+          className="max-sm:w-full max-sm:px-4 max-sm:text-sm"
           color="accent"
           onClick={() =>
             navigate(state?.spaceId ? `/app/disponibilidad/${state.spaceId}` : '/app/disponibilidad')

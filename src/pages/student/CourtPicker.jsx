@@ -41,12 +41,12 @@ function CourtCard({ space, freeToday, availabilityError, disciplineNames, onOpe
             </span>
           ))}
         </div>
-        <p className="absolute bottom-3 left-4 font-display text-lg font-semibold text-white drop-shadow">
+        <p className="absolute inset-x-4 bottom-3 font-display text-lg font-semibold text-white drop-shadow">
           {space.name}
         </p>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-5">
+      <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
         <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Clock className="size-4" />
@@ -58,7 +58,7 @@ function CourtCard({ space, freeToday, availabilityError, disciplineNames, onOpe
           </span>
         </div>
         {space.requirements && <p className="text-xs text-muted-foreground">{space.requirements}</p>}
-        <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-1">
           {availabilityError ? (
             <Badge variant="warning">Disponibilidad sin conexión</Badge>
           ) : freeToday == null ? (
@@ -136,7 +136,7 @@ export default function CourtPicker() {
   }))
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Disponibilidad"
         subtitle="Elige una cancha para ver su recorrido 360° y el calendario de franjas."
