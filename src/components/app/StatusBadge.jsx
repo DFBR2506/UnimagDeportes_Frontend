@@ -1,5 +1,5 @@
 import Badge from '@/components/smoothui/badge'
-import { RESERVATION_STATES } from '@/data/mock'
+import { RESERVATION_STATES } from '@/data/domain'
 
 const SLOT_VARIANTS = {
   libre: 'success',

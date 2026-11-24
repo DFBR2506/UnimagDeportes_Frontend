@@ -2,151 +2,165 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Paleta del Figma prototipo-unimag_deportes: navy #03294f, verde #65b82e,
+   fondo #f3f5f7, azul #1769ab, rojo #c72929 y superficies suaves. */
 :root {
-  --background: oklch(0.985 0 0);
-  --border: oklch(0.91 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0 0);
-  --foreground: oklch(0.16 0 0);
-  --input: color-mix(in oklch, var(--foreground) 25%, transparent);
-  --muted: oklch(0.955 0 0);
-  --muted-foreground: oklch(0.34 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0 0);
-  --primary: oklch(0.972 0 0);
-  --primary-foreground: oklch(0.34 0 0);
-  --ring: oklch(0.44 0.12 255);
-  --secondary: oklch(0.955 0 0);
-  --secondary-foreground: oklch(0.47 0 0);
-  --accent: oklch(0.44 0.12 255);
-  --accent-foreground: oklch(0.985 0.005 250);
-  --chart-1: oklch(0.44 0.12 255);
-  --chart-2: oklch(0.84 0.155 88);
-  --chart-3: oklch(0.55 0.21 29);
-  --chart-4: oklch(0.62 0.11 255);
-  --chart-5: oklch(0.86 0.06 90);
-  --destructive: oklch(0.55 0.21 29);
-  --sidebar: oklch(0.28 0.075 255);
-  --sidebar-accent: oklch(0.345 0.08 255);
-  --sidebar-accent-foreground: oklch(0.99 0.005 250);
-  --sidebar-border: oklch(0.35 0.07 255);
-  --sidebar-foreground: oklch(0.95 0.012 250);
-  --sidebar-primary: oklch(0.84 0.155 88);
-  --sidebar-primary-foreground: oklch(0.24 0.05 255);
-  --sidebar-ring: oklch(0.84 0.155 88);
+  --background: #f3f5f7;
+  --border: #d5dbe2;
+  --card: #ffffff;
+  --card-foreground: #03294f;
+  --foreground: #03294f;
+  --input: color-mix(in oklch, var(--foreground) 22%, transparent);
+  --muted: #e9edf1;
+  --muted-foreground: #4a6580;
+  --popover: #ffffff;
+  --popover-foreground: #03294f;
+  --primary: #f7f9fa;
+  --primary-foreground: #3f5c79;
+  --ring: #1769ab;
+  --secondary: #e9edf1;
+  --secondary-foreground: #3f5c79;
+  --accent: #65b82e;
+  --accent-foreground: #03294f;
+  --accent-ink: #3d7d17;
+  --chart-1: #03294f;
+  --chart-2: #65b82e;
+  --chart-3: #c72929;
+  --chart-4: #1769ab;
+  --chart-5: #c6e4b1;
+  --destructive: #c72929;
+  --sidebar: #03294f;
+  --sidebar-accent: #13365a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #234465;
+  --sidebar-foreground: #e8f2fa;
+  --sidebar-primary: #65b82e;
+  --sidebar-primary-foreground: #03294f;
+  --sidebar-ring: #65b82e;
   --radius: 0.75rem;
-  --amber: oklch(0.84 0.155 88);
-  --amber-fg: oklch(0.23 0.03 85);
-  --amber-hover: oklch(0.78 0.155 85);
-  --amber-ink: oklch(0.56 0.12 85);
-  --blue: oklch(0.44 0.12 255);
+  --surface-info: #e8f2fa;
+  --surface-success: #ebf7e0;
+  --surface-danger: #fff0f0;
+  --surface-warning: #f5e6c7;
+  --amber: #65b82e;
+  --amber-fg: #03294f;
+  --amber-hover: #57a326;
+  --amber-ink: #3d7d17;
+  --blue: #1769ab;
   --blue-fg: #fff;
-  --blue-hover: oklch(0.37 0.115 255);
-  --blue-ink: oklch(0.44 0.12 255);
-  --brand-ink: oklch(0.44 0.12 255);
+  --blue-hover: #125a91;
+  --blue-ink: #1769ab;
+  --brand-ink: #3d7d17;
   --destructive-fg: #fff;
-  --destructive-ink: oklch(0.5 0.2 27);
-  --green: oklch(0.7 0.17 152);
-  --green-fg: oklch(0.16 0 0);
-  --green-hover: oklch(0.64 0.18 152);
-  --green-ink: oklch(0.5 0.14 152);
-  --info: oklch(0.44 0.12 255);
+  --destructive-ink: #b02020;
+  --green: #65b82e;
+  --green-fg: #03294f;
+  --green-hover: #57a326;
+  --green-ink: #3d7d17;
+  --info: #1769ab;
   --info-foreground: #fff;
-  --success: oklch(0.7 0.17 152);
-  --success-foreground: oklch(0.16 0 0);
+  --success: #65b82e;
+  --success-foreground: #03294f;
   --thumb: #fff;
-  --warning: oklch(0.84 0.155 88);
-  --warning-foreground: oklch(0.16 0 0);
-  --smooth-50: oklch(0.985 0 0);
-  --smooth-100: oklch(0.972 0 0);
-  --smooth-200: oklch(0.955 0 0);
-  --smooth-300: oklch(0.91 0 0);
-  --smooth-400: oklch(0.865 0 0);
-  --smooth-500: oklch(0.81 0 0);
-  --smooth-600: oklch(0.74 0 0);
-  --smooth-700: oklch(0.66 0 0);
-  --smooth-800: oklch(0.56 0 0);
-  --smooth-900: oklch(0.47 0 0);
-  --smooth-950: oklch(0.34 0 0);
-  --smooth-1000: oklch(0.16 0 0);
-  --brand: oklch(0.44 0.12 255);
-  --brand-light: oklch(0.54 0.11 255);
-  --brand-lighter: oklch(0.72 0.075 255);
-  --brand-secondary: oklch(0.37 0.115 255);
-  --on-brand: #fff;
+  --warning: #d99a1e;
+  --warning-foreground: #03294f;
+  --smooth-50: #f9fafb;
+  --smooth-100: #f3f5f7;
+  --smooth-200: #e9edf1;
+  --smooth-300: #d5dbe2;
+  --smooth-400: #b7c2cd;
+  --smooth-500: #9ba8b7;
+  --smooth-600: #8194a7;
+  --smooth-700: #617991;
+  --smooth-800: #4a6580;
+  --smooth-900: #3f5c79;
+  --smooth-950: #234465;
+  --smooth-1000: #03294f;
+  --brand: #65b82e;
+  --brand-light: #7cc74a;
+  --brand-lighter: #c6e4b1;
+  --brand-secondary: #57a326;
+  --on-brand: #03294f;
+  /* alto de la barra inferior móvil (Shell) con el área segura */
+  --bottom-bar-space: calc(4rem + env(safe-area-inset-bottom, 0px));
 }
 
 .dark {
-  --background: oklch(0.16 0 0);
-  --border: oklch(0.3 0 0);
-  --card: oklch(0.21 0 0);
-  --card-foreground: oklch(0.96 0 0);
-  --foreground: oklch(0.96 0 0);
-  --input: color-mix(in oklch, var(--foreground) 25%, transparent);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.85 0 0);
-  --popover: oklch(0.21 0 0);
-  --popover-foreground: oklch(0.96 0 0);
-  --primary: oklch(0.21 0 0);
-  --primary-foreground: oklch(0.85 0 0);
-  --ring: oklch(0.62 0.11 255);
-  --secondary: oklch(0.25 0 0);
-  --secondary-foreground: oklch(0.74 0 0);
-  --accent: oklch(0.62 0.11 255);
-  --accent-foreground: oklch(0.14 0.02 255);
-  --chart-1: oklch(0.62 0.11 255);
-  --chart-2: oklch(0.84 0.155 88);
-  --chart-3: oklch(0.62 0.2 29);
-  --chart-4: oklch(0.47 0 0);
-  --chart-5: oklch(0.36 0 0);
-  --destructive: oklch(0.62 0.2 29);
-  --sidebar: oklch(0.21 0.05 255);
-  --sidebar-accent: oklch(0.27 0.06 255);
-  --sidebar-accent-foreground: oklch(0.99 0.005 250);
-  --sidebar-border: oklch(0.28 0.055 255);
-  --sidebar-foreground: oklch(0.93 0.012 250);
-  --sidebar-primary: oklch(0.84 0.155 88);
-  --sidebar-primary-foreground: oklch(0.24 0.05 255);
-  --sidebar-ring: oklch(0.84 0.155 88);
-  --amber: oklch(0.84 0.155 88);
-  --amber-fg: oklch(0.2 0 0);
-  --amber-hover: oklch(0.88 0.14 88);
-  --amber-ink: oklch(0.84 0.155 88);
-  --blue: oklch(0.62 0.11 255);
-  --blue-fg: #fff;
-  --blue-hover: oklch(0.5 0.2 256);
-  --blue-ink: oklch(0.72 0.1 255);
-  --brand-ink: oklch(0.62 0.11 255);
-  --destructive-fg: oklch(0.2 0 0);
-  --destructive-ink: oklch(0.704 0.191 22.216);
-  --green: oklch(0.73 0.16 152);
-  --green-fg: oklch(0.2 0 0);
-  --green-hover: oklch(0.79 0.15 152);
-  --green-ink: oklch(0.73 0.16 152);
-  --info: oklch(0.62 0.11 255);
-  --info-foreground: #fff;
-  --success: oklch(0.73 0.16 152);
-  --success-foreground: oklch(0.2 0 0);
+  --background: #021a33;
+  --border: #1b3d60;
+  --card: #062543;
+  --card-foreground: #e8f2fa;
+  --foreground: #e8f2fa;
+  --input: color-mix(in oklch, var(--foreground) 22%, transparent);
+  --muted: #0b2c4d;
+  --muted-foreground: #a0afbd;
+  --popover: #062543;
+  --popover-foreground: #e8f2fa;
+  --primary: #062543;
+  --primary-foreground: #b7c2cd;
+  --ring: #4f9ad6;
+  --secondary: #0b2c4d;
+  --secondary-foreground: #b7c2cd;
+  --accent: #65b82e;
+  --accent-foreground: #03294f;
+  --accent-ink: #8fd45f;
+  --chart-1: #4f9ad6;
+  --chart-2: #65b82e;
+  --chart-3: #e05555;
+  --chart-4: #8194a7;
+  --chart-5: #3f5c79;
+  --destructive: #e05555;
+  --sidebar: #011427;
+  --sidebar-accent: #0b2c4d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #13365a;
+  --sidebar-foreground: #e8f2fa;
+  --sidebar-primary: #65b82e;
+  --sidebar-primary-foreground: #03294f;
+  --sidebar-ring: #65b82e;
+  --surface-info: #0d2f52;
+  --surface-success: #16351a;
+  --surface-danger: #3a1518;
+  --surface-warning: #3a2e14;
+  --amber: #65b82e;
+  --amber-fg: #03294f;
+  --amber-hover: #7cc74a;
+  --amber-ink: #8fd45f;
+  --blue: #4f9ad6;
+  --blue-fg: #021a33;
+  --blue-hover: #6aaee3;
+  --blue-ink: #7db8e8;
+  --brand-ink: #8fd45f;
+  --destructive-fg: #fff;
+  --destructive-ink: #f07a7a;
+  --green: #65b82e;
+  --green-fg: #03294f;
+  --green-hover: #7cc74a;
+  --green-ink: #8fd45f;
+  --info: #4f9ad6;
+  --info-foreground: #021a33;
+  --success: #65b82e;
+  --success-foreground: #03294f;
   --thumb: #fff;
-  --warning: oklch(0.84 0.155 88);
-  --warning-foreground: oklch(0.2 0 0);
-  --smooth-50: oklch(0.16 0 0);
-  --smooth-100: oklch(0.21 0 0);
-  --smooth-200: oklch(0.25 0 0);
-  --smooth-300: oklch(0.3 0 0);
-  --smooth-400: oklch(0.36 0 0);
-  --smooth-500: oklch(0.41 0 0);
-  --smooth-600: oklch(0.47 0 0);
-  --smooth-700: oklch(0.55 0 0);
-  --smooth-800: oklch(0.66 0 0);
-  --smooth-900: oklch(0.74 0 0);
-  --smooth-950: oklch(0.85 0 0);
-  --smooth-1000: oklch(0.96 0 0);
-  --brand: oklch(0.62 0.11 255);
-  --brand-light: oklch(0.7 0.1 255);
-  --brand-lighter: oklch(0.8 0.07 255);
-  --brand-secondary: oklch(0.52 0.11 255);
-  --on-brand: oklch(0.13 0.02 255);
+  --warning: #e0a526;
+  --warning-foreground: #021a33;
+  --smooth-50: #021a33;
+  --smooth-100: #062543;
+  --smooth-200: #0b2c4d;
+  --smooth-300: #13365a;
+  --smooth-400: #1b3d60;
+  --smooth-500: #234465;
+  --smooth-600: #3f5c79;
+  --smooth-700: #617991;
+  --smooth-800: #8194a7;
+  --smooth-900: #a0afbd;
+  --smooth-950: #d5dbe2;
+  --smooth-1000: #e8f2fa;
+  --brand: #65b82e;
+  --brand-light: #7cc74a;
+  --brand-lighter: #3d7d17;
+  --brand-secondary: #57a326;
+  --on-brand: #03294f;
 }
 
 @theme inline {
@@ -169,6 +183,11 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-ink: var(--accent-ink);
+  --color-surface-info: var(--surface-info);
+  --color-surface-success: var(--surface-success);
+  --color-surface-danger: var(--surface-danger);
+  --color-surface-warning: var(--surface-warning);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -251,6 +270,50 @@
   @apply transition-[background-color,border-color,color,box-shadow] duration-150 ease-out motion-reduce:transition-none;
 }
 
+/* GlowHover duplica cada card en una capa de brillo: solo dejamos visible el borde/tinte
+   para que la card original (imagen con zoom, textos) siga viéndose debajo. */
+.glow-overlay-item > * {
+  visibility: hidden;
+}
+
+/* Impresión del QR (AdminQR): solo se imprime la hoja con el nombre y el código. */
+.print-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 18mm;
+  }
+  body > *:not(.print-sheet) {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .print-sheet {
+    display: flex;
+    min-height: calc(100vh - 36mm);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14mm;
+    color: #000;
+  }
+  .print-sheet h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 30pt;
+    font-weight: 700;
+    text-align: center;
+  }
+  .print-sheet-qr {
+    width: 120mm;
+    height: 120mm;
+    color: #000;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -260,6 +323,8 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    /* viewport-fit=cover: en horizontal el contenido no queda bajo el notch */
+    padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
   }
   h1, h2, h3 {
     @apply font-display;

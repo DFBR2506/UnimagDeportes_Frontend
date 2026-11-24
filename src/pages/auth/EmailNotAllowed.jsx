@@ -11,15 +11,15 @@ export default function EmailNotAllowed() {
   const email = location.state?.email
 
   return (
-    <motion.div className="space-y-8" {...staggerParent}>
+    <motion.div className="space-y-6 sm:space-y-8" {...staggerParent}>
       <motion.div className="space-y-3" {...staggerChild}>
-        <h1 className="font-display text-4xl font-bold tracking-tight text-foreground">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground min-[360px]:text-3xl sm:text-4xl">
           Correo no permitido
         </h1>
         <p className="text-muted-foreground">No pudimos solicitar el código.</p>
       </motion.div>
 
-      <motion.div {...staggerChild}>
+      <motion.div className="wrap-anywhere" {...staggerChild}>
         <Alert
           icon={<MailX className="size-4" />}
           title={email ? `${email} no pertenece al dominio institucional` : 'Dominio no institucional'}

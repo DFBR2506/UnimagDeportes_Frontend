@@ -63,7 +63,7 @@ const ToggleGroupItem = ({
 }: ToggleGroupItemProps) => (
   <Toggle
     className={cn(
-      "h-8 shrink-0 rounded-md border-transparent bg-transparent px-2.5 shadow-none",
+      "h-8 shrink-0 pointer-coarse:h-10 rounded-md border-transparent bg-transparent px-2.5 shadow-none",
       "hover:bg-muted/80",
       // Dark: lift the chip with foreground tint; `bg-background`/`bg-input` look sunken on stage
       "data-pressed:bg-background data-pressed:text-foreground data-pressed:shadow-sm dark:data-pressed:bg-foreground/15",
