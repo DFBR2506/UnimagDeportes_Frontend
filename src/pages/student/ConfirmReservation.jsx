@@ -27,12 +27,17 @@ export default function ConfirmReservation() {
   // sigue visible durante la transición de salida.
   const [draft] = useState(liveDraft)
   const [equipment, setEquipment] = useState(null) // disponibilidad de implementos (UC13)
+  const [equipmentError, setEquipmentError] = useState(null)
+  const [equipmentRetry, setEquipmentRetry] = useState(0)
   const [requested, setRequested] = useState({}) // equipmentId → cantidad
 
   // GET /equipment/availability: implementos con unidades libres en la ventana.
   useEffect(() => {
     if (!draft) return
     const controller = new AbortController()
+    setEquipment(null)
+    setEquipmentError(null)
+    setRequested({})
     api('/equipment/availability', {
       query: {
         startAt: toInstant(draft.date, draft.startHour),
@@ -41,10 +46,12 @@ export default function ConfirmReservation() {
       },
       signal: controller.signal,
     })
-      .then((res) => setEquipment(res.items))
-      .catch((err) => err?.name !== 'AbortError' && setEquipment([]))
+      .then((res) => !controller.signal.aborted && setEquipment(res.items))
+      .catch((err) => {
+        if (!controller.signal.aborted && err?.name !== 'AbortError') setEquipmentError(err)
+      })
     return () => controller.abort()
-  }, [draft])
+  }, [draft, equipmentRetry])
 
   if (!draft) return <Navigate to="/app/disponibilidad" replace />
 
@@ -146,7 +153,16 @@ export default function ConfirmReservation() {
               <Dumbbell className="size-5 text-accent-ink" />
               Implementos <span className="text-sm font-normal text-muted-foreground">(opcional)</span>
             </h2>
-            {equipment == null ? (
+            {equipmentError ? (
+              <div className="mt-4 space-y-3">
+                <Alert title="No se pudieron consultar los implementos" variant="warning">
+                  {errorMessage(equipmentError)} Puedes reservar sin implementos.
+                </Alert>
+                <SmoothButton onClick={() => setEquipmentRetry((retry) => retry + 1)} variant="outline">
+                  Reintentar
+                </SmoothButton>
+              </div>
+            ) : equipment == null ? (
               <div className="mt-5 space-y-3">
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />

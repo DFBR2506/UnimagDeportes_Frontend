@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-
 import { ClipboardList, Dumbbell, Gauge, QrCode, ScrollText, SquareStack } from 'lucide-react'
 import { AppProvider, useApp } from '@/store'
 import Shell from '@/components/app/Shell'
+import ConnectionState from '@/components/app/ConnectionState'
 import SubnavLayout from '@/components/app/SubnavLayout'
 import AuthLayout from '@/pages/auth/AuthLayout'
 import Welcome from '@/pages/auth/Welcome'
@@ -40,9 +41,9 @@ const SPACE_TABS = [
 ]
 
 function RootRedirect() {
-  const { token, me } = useApp()
+  const { token, me, sessionError, retrySession } = useApp()
   if (!token) return <Navigate to="/bienvenida" replace />
-  if (!me) return null // el Shell resuelve la sesión al entrar
+  if (!me) return <ConnectionState error={sessionError} onRetry={retrySession} />
   return <Navigate to={me.role === 'ADMIN' ? '/admin' : '/app/inicio'} replace />
 }
 

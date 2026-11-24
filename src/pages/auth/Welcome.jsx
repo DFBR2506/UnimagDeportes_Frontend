@@ -6,6 +6,7 @@ import SmoothButton from '@/components/smoothui/smooth-button'
 import Separator from '@/components/smoothui/separator'
 import { staggerChild, staggerParent } from '@/lib/anim'
 import { useApp } from '@/store'
+import { DEMO_ENABLED } from '@/lib/config'
 
 const FEATURES = [
   { icon: CalendarCheck2, text: 'Disponibilidad en tiempo real' },
@@ -85,7 +86,7 @@ export default function Welcome() {
         </p>
       </motion.div>
 
-      <motion.div className="space-y-4" {...staggerChild}>
+      {DEMO_ENABLED && <motion.div className="space-y-4" {...staggerChild}>
         <div className="flex items-center gap-3">
           <Separator className="flex-1" />
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -104,7 +105,7 @@ export default function Welcome() {
         <p className="text-center text-xs text-muted-foreground">
           Sesión simulada con datos de ejemplo: no usa el backend ni pide código.
         </p>
-      </motion.div>
+      </motion.div>}
     </motion.div>
   )
 }

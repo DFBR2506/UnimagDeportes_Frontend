@@ -20,6 +20,8 @@ import DropdownMenu from '@/components/smoothui/dropdown-menu'
 import Avatar from '@/components/smoothui/avatar'
 import ContactFab from '@/components/app/ContactDialog'
 import Toaster from '@/components/smoothui/toast'
+import ConnectionState from '@/components/app/ConnectionState'
+import SmoothButton from '@/components/smoothui/smooth-button'
 import Spinner from '@/components/smoothui/spinner'
 import Logo from '@/components/app/Logo'
 import { pageVariants } from '@/lib/anim'
@@ -157,7 +159,7 @@ function BottomBar({ items, className }) {
  * estudiantes y administradores; en pantallas pequeñas la navegación va en una barra inferior.
  */
 export default function Shell({ variant = 'student' }) {
-  const { token, session, logout, isAdmin, sessionNotice } = useApp()
+  const { token, session, logout, isAdmin, sessionNotice, sessionError, retrySession, dataError, dataLoaded, refreshData } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
   const [contactOpen, setContactOpen] = useState(false)
@@ -175,9 +177,7 @@ export default function Shell({ variant = 'student' }) {
   // Token guardado pero aún sin GET /me.
   if (!session) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-background">
-        <Spinner aria-label="Cargando tu sesión" className="text-accent-ink" size="lg" />
-      </div>
+      <ConnectionState error={sessionError} onRetry={retrySession} />
     )
   }
   if (session.needsName) {
@@ -270,7 +270,9 @@ export default function Shell({ variant = 'student' }) {
               animate="animate"
               exit="exit"
             >
-              <Outlet />
+              {dataError || !dataLoaded ? (
+                <ConnectionState error={dataError} onRetry={refreshData} label="Cargando datos" retryLabel="Reintentar" />
+              ) : <Outlet />}
             </motion.div>
           </AnimatePresence>
         </main>

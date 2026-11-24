@@ -6,14 +6,17 @@ import GlowHover from '@/components/smoothui/glow-hover-card'
 import Badge from '@/components/smoothui/badge'
 import Empty from '@/components/smoothui/empty'
 import Skeleton from '@/components/smoothui/skeleton'
+import Alert from '@/components/smoothui/alert'
+import SmoothButton from '@/components/smoothui/smooth-button'
 import PageHeader from '@/components/app/PageHeader'
 import CourtArt, { courtKind } from '@/components/app/CourtArt'
 import useSpaceImage from '@/lib/useSpaceImage'
 import { EASE } from '@/lib/anim'
+import { errorMessage } from '@/lib/api'
 import { formatHour, todayISO } from '@/data/domain'
 import { useApp } from '@/store'
 
-function CourtCard({ space, freeToday, disciplineNames, onOpen, ref }) {
+function CourtCard({ space, freeToday, availabilityError, disciplineNames, onOpen, ref }) {
   const image = useSpaceImage(space.id, 'PREVIEW')
   return (
     <button
@@ -56,7 +59,9 @@ function CourtCard({ space, freeToday, disciplineNames, onOpen, ref }) {
         </div>
         {space.requirements && <p className="text-xs text-muted-foreground">{space.requirements}</p>}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-1">
-          {freeToday == null ? (
+          {availabilityError ? (
+            <Badge variant="warning">Disponibilidad sin conexión</Badge>
+          ) : freeToday == null ? (
             <Skeleton className="h-5 w-32 rounded-full" />
           ) : (
             <Badge variant={freeToday > 0 ? 'success' : 'secondary'}>
@@ -77,31 +82,45 @@ export default function CourtPicker() {
   const navigate = useNavigate()
   const { spaces, spacesLoaded, refreshSpaces, fetchAvailability, disciplineById } = useApp()
   const [freeToday, setFreeToday] = useState({}) // spaceId → franjas reservables hoy
+  const [spacesError, setSpacesError] = useState(null)
+  const [availabilityErrors, setAvailabilityErrors] = useState({})
+  const [reloadKey, setReloadKey] = useState(0)
 
   // GET /spaces solo trae espacios activos (RN-09); se refresca al entrar.
   useEffect(() => {
-    refreshSpaces().catch(() => {})
-  }, [refreshSpaces])
+    let alive = true
+    setSpacesError(null)
+    refreshSpaces().catch((error) => alive && setSpacesError(error))
+    return () => { alive = false }
+  }, [refreshSpaces, reloadKey])
 
   const ids = spaces.map((s) => s.id).join(',')
   useEffect(() => {
     if (!ids) return
     const controller = new AbortController()
+    setFreeToday({})
+    setAvailabilityErrors({})
     const today = todayISO()
     for (const id of ids.split(',')) {
       fetchAvailability(id, today, undefined, controller.signal)
-        .then((slots) =>
+        .then((slots) => {
+          if (controller.signal.aborted) return
+          setAvailabilityErrors((prev) => ({ ...prev, [id]: null }))
           setFreeToday((prev) => ({
             ...prev,
             [id]: slots.filter((s) => s.estado === 'libre' && s.bookable).length,
           }))
-        )
-        .catch(() => {})
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted && error?.name !== 'AbortError') {
+            setAvailabilityErrors((prev) => ({ ...prev, [id]: error }))
+          }
+        })
     }
     return () => controller.abort()
     // fetchAvailability cambia con las reservas propias; basta con recalcular por espacios
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids])
+  }, [ids, reloadKey])
 
   const items = spaces.map((space) => ({
     id: space.id,
@@ -109,6 +128,7 @@ export default function CourtPicker() {
       <CourtCard
         disciplineNames={space.disciplines.map((d) => disciplineById(d)?.name ?? d)}
         freeToday={freeToday[space.id]}
+        availabilityError={availabilityErrors[space.id]}
         onOpen={(id) => navigate(`/app/disponibilidad/${id}`)}
         space={space}
       />
@@ -121,13 +141,21 @@ export default function CourtPicker() {
         title="Disponibilidad"
         subtitle="Elige una cancha para ver su recorrido 360° y el calendario de franjas."
       />
+      {(spacesError || Object.values(availabilityErrors).some(Boolean)) && (
+        <div className="space-y-3">
+          <Alert title="No se pudo actualizar la disponibilidad" variant="warning">
+            {spacesError ? errorMessage(spacesError) : 'Falló la consulta de algunas canchas. No se pudo confirmar si hay franjas libres.'}
+          </Alert>
+          <SmoothButton onClick={() => setReloadKey((key) => key + 1)} variant="outline">Reintentar</SmoothButton>
+        </div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, ease: EASE, delay: 0.25 }}
       >
-        {!spacesLoaded ? (
+        {spacesError && spaces.length === 0 ? null : !spacesLoaded ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="aspect-[4/3] rounded-2xl" />

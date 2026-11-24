@@ -23,6 +23,10 @@ export function AppProvider({ children }) {
   const [token, setTokenState] = useState(getToken)
   const [me, setMe] = useState(null)
   const [sessionNotice, setSessionNotice] = useState(null) // 'expired' tras un 401
+  const [sessionError, setSessionError] = useState(null)
+  const [sessionRetry, setSessionRetry] = useState(0)
+  const [dataError, setDataError] = useState(null)
+  const [dataLoaded, setDataLoaded] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [spaces, setSpaces] = useState([])
   const [spacesLoaded, setSpacesLoaded] = useState(false)
@@ -40,6 +44,10 @@ export function AppProvider({ children }) {
     setSpaces([])
     setSpacesLoaded(false)
     setDraft(null)
+    setSettings(DEFAULT_SETTINGS)
+    setSessionError(null)
+    setDataError(null)
+    setDataLoaded(false)
   }, [])
 
   // 401 en cualquier petición → la sesión venció (RN-56); PROFILE_INCOMPLETE → pedir nombre (RN-59).
@@ -60,50 +68,69 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!token || me) return
     let alive = true
+    setSessionError(null)
     api('/me')
-      .then((user) => alive && setMe(user))
-      .catch(() => alive && clearSession())
+      .then((user) => alive && getToken() === token && setMe(user))
+      .catch((error) => {
+        if (alive && getToken() === token && error.status !== 401) setSessionError(error)
+      })
     return () => {
       alive = false
     }
-  }, [token, me, clearSession])
+  }, [token, me, sessionRetry])
 
   const refreshReservations = useCallback(async () => {
+    const requestToken = getToken()
     const res = await api('/reservations/mine')
     const list = res.reservations.map(mapReservation)
-    setReservations(list)
+    if (getToken() === requestToken) setReservations(list)
     return list
   }, [])
 
   const refreshQuota = useCallback(async () => {
+    const requestToken = getToken()
     const q = mapQuota(await api('/quota/me'))
-    setQuota(q)
+    if (getToken() === requestToken) setQuota(q)
     return q
   }, [])
 
   const refreshSpaces = useCallback(async () => {
+    const requestToken = getToken()
     const res = await api('/spaces')
     const list = res.spaces.map(mapSpace).sort((a, b) => a.name.localeCompare(b.name, 'es'))
-    setSpaces(list)
-    setSpacesLoaded(true)
+    if (getToken() === requestToken) {
+      setSpaces(list)
+      setSpacesLoaded(true)
+    }
     return list
   }, [])
 
   const refreshRules = useCallback(async () => {
+    const requestToken = getToken()
     const r = mapRules(await api('/rules'))
-    setSettings(r)
+    if (getToken() === requestToken) setSettings(r)
     return r
   }, [])
+
+  const refreshData = useCallback(async () => {
+    const requestToken = getToken()
+    setDataLoaded(false)
+    setDataError(null)
+    const results = await Promise.allSettled([
+      refreshRules(), refreshSpaces(), refreshReservations(), refreshQuota(),
+    ])
+    if (getToken() !== requestToken) return
+    const failure = results.find((result) => result.status === 'rejected')
+    if (failure) setDataError(failure.reason)
+    else setDataLoaded(true)
+  }, [refreshRules, refreshSpaces, refreshReservations, refreshQuota])
 
   // Datos base una vez que el perfil está completo.
   const ready = Boolean(me && !me.needsName)
   useEffect(() => {
     if (!ready) return
-    refreshRules().catch(() => {})
-    refreshSpaces().catch(() => setSpacesLoaded(true))
-    refreshReservations().catch(() => {})
-    refreshQuota().catch(() => {})
-  }, [ready, refreshRules, refreshSpaces, refreshReservations, refreshQuota])
+    refreshData()
+  }, [ready, token, refreshData])
 
   // ---------------------------------------------------------------- acceso (UC01)
 
@@ -111,8 +138,12 @@ export function AppProvider({ children }) {
     setToken(newToken)
     setTokenState(newToken)
     setSessionNotice(null)
+    setSessionError(null)
+    setDataError(null)
+    setDataLoaded(false)
+    setMe(null)
     const user = await api('/me')
-    setMe(user)
+    if (getToken() === newToken) setMe(user)
     return user
   }
 
@@ -215,6 +246,8 @@ export function AppProvider({ children }) {
     session: me,
     isAdmin,
     sessionNotice,
+    sessionError,
+    retrySession: () => setSessionRetry((retry) => retry + 1),
     setSessionNotice,
     requestCode,
     verifyCode,
@@ -223,6 +256,9 @@ export function AppProvider({ children }) {
     logout,
     withReauth,
     // datos
+    dataError,
+    dataLoaded,
+    refreshData,
     settings,
     refreshRules,
     spaces,

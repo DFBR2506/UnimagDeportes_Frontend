@@ -1,7 +1,7 @@
-# Unimag Deportes — Prototipo web
+# Unimag Deportes — Cliente web
 
-Prototipo simulado (sin backend) de la plataforma de reserva de espacios deportivos de la
-Universidad del Magdalena. Implementa las pantallas del prototipo de Figma
+Cliente de la API real de reservas de espacios deportivos de la Universidad del
+Magdalena, con demostración opcional en el navegador. Implementa las pantallas de Figma
 (`prototipo-unimag_deportes`) sobre las reglas de negocio del proyecto
 [Unimag-Deportes](../Unimag-Deportes/docs/reglas-y-contexto/unimagDeportes.md).
 
@@ -22,24 +22,101 @@ npm install
 npm run dev
 ```
 
+Si necesita configuración local, copie `.env.example` a `.env.local` **solo si este
+último no existe**. Los valores predeterminados son:
+
+```dotenv
+VITE_API_URL=/api
+VITE_BACKEND_URL=http://localhost:8080
+VITE_DEMO_LOGIN=false
+```
+
+El navegador solicita `/api/...`; el proxy de desarrollo de Vite retira `/api`
+y reenvía a Spring Boot. La API real no tiene ese prefijo. Reinicie Vite o
+recompile tras cambiar variables. Todas las variables `VITE_*` son públicas:
+no incluya secretos JWT, SMTP ni PostgreSQL.
+
+### Backend local y acceso OTP
+
+Desde `../Unimag-Deportes`, complete su entorno según
+[la guía del backend](../Unimag-Deportes/docs/techincal-plan/backend-connection.md).
+Necesita claves independientes de al menos 32 bytes en `APP_AUTH_JWT_SECRET` y
+`APP_AUTH_CODE_HMAC_SECRET`, además de:
+
+```dotenv
+APP_AUTH_ADMIN_EMAILS=<correo institucional administrador>
+APP_CORS_ALLOWED_ORIGINS=http://localhost:5173
+APP_CHECKIN_FRONTEND_ORIGIN=http://localhost:5173
+APP_MAIL_CONTACT_URL=http://localhost:5173/app/contacto
+APP_MAIL_CANCELLATION_URL=http://localhost:5173/reservations/{id}/cancel
+APP_MAIL_CONTACT_RECIPIENT=salcendra@unimagdalena.edu.co
+SPRING_PROFILES_ACTIVE=dev
+APP_PORT=8080
+```
+
+Los marcadores `<...>` deben completarse; no son valores válidos. No sobrescriba
+un `.env` existente ni guarde secretos en Git. Para ejecutar el backend en Docker:
+
+```powershell
+docker compose --profile app up --build -d
+docker compose --profile app ps
+```
+
+Espere a que `app` esté saludable. Después de cambiar variables, recree únicamente
+la aplicación con `docker compose --profile app up -d --force-recreate app`;
+no borre volúmenes ni recree la base de datos para corregir configuración.
+
+Los códigos reales se capturan en **Mailpit: http://localhost:8025**; no se envían a
+Internet. Compose fija SMTP en `mailpit:1025`, por lo que cambiar `MAIL_HOST` en
+`.env` no habilita por sí solo un proveedor externo. El rol lo asigna el backend:
+`APP_AUTH_ADMIN_EMAILS` solo afecta el rol inicial de cuentas nuevas, no promueve
+cuentas existentes ni depende del prefijo del correo.
+
+Para comprobar el proxy sin solicitar un código:
+
+```powershell
+curl.exe -i http://localhost:5173/api/me
+```
+
+Un `401` sin token demuestra conectividad. Si falla la solicitud de código,
+revise la respuesta de `/api/auth/code`, el estado de la API, las URLs de correo,
+los límites de reenvío y SMTP. Mantenga los orígenes coherentes con el puerto
+real de Vite. Para QR HTTP local se requiere el perfil `dev`; desactívelo en producción.
+Un teléfono no puede acceder a su PC mediante `localhost`: necesita un origen
+accesible desde la red y configuración correspondiente.
+
 ## Recorrido
 
 - **Acceso (UC01):** bienvenida → correo institucional (solo `@unimagdalena.edu.co`) →
-  código OTP de 6 dígitos (cualquier código vale en el prototipo) → nombre en el primer
-  ingreso. La sesión persiste en `localStorage`.
+  código OTP real de 6 dígitos → nombre en el primer ingreso. El JWT se conserva en
+  `localStorage` bajo `ud-token` y viaja solo en `Authorization: Bearer`, nunca en URLs
+  ni cookies. Los fallos transitorios de sesión y carga inicial permiten reintentar.
 - **Estudiante:** inicio, disponibilidad (disciplina/espacio/fecha, hasta 2 franjas
   consecutivas), confirmación con validaciones (RN-10..18), comprobante, mis reservas,
   cancelación a tiempo/tardía, cuota semanal, reglas, contacto y check-in QR
   (`/checkin/:espacio`, con ventana real).
-- **Administrador:** inicia sesión con un correo que empiece por `admin`
-  (p. ej. `admin.deportes@unimagdalena.edu.co`) y entra por «Modo administrador»:
+- **Administrador:** inicia sesión con una cuenta cuyo rol sea `ADMIN` y entra por «Modo administrador»:
   panel de ocupación, espacios y franjas (crear/editar), bloqueos institucionales
   (cancelan reservas afectadas — RN-43), configuración de reglas (se refleja en toda la
   app) y generación de QR por espacio.
 
-La ocupación de franjas es determinista por (espacio, fecha, hora); reservas, bloqueos,
-espacios y reglas editadas persisten en `localStorage`. Para reiniciar la demo, borra el
-almacenamiento del sitio.
+La API es la autoridad para permisos, cuota, disponibilidad, stock y sanciones.
+Usa UUID y fechas de `America/Bogota`; el calendario abarca hoy…hoy + 6 inclusive.
+Una instalación nueva puede no contener espacios ni implementos: créelos mediante
+la administración, sin insertar fixtures demo en la base compartida.
+
+En creación y edición de espacios solo se prohíbe **Fútbol 5 + Fútbol 11**.
+El formulario, la simulación y el backend validan esa combinación. Las demás siguen
+permitidas, incluidos baloncesto + voleibol y Fútbol 5 + tenis.
+
+### Demostración opcional
+
+Solo `VITE_DEMO_LOGIN=true` muestra el bloque «Recorrido MVP» y habilita sesiones
+simuladas. Ausencia, vacío, `false`, `TRUE` y `1` no la activan. No utiliza
+`/dev/login` ni se activa como respaldo ante fallos de red o de la API.
+Al desactivarla se elimina un token `demo:*` antiguo, pero se conservan los datos demo.
+Exclusivamente en la simulación, la ocupación es determinista y reservas, bloqueos,
+espacios y reglas persisten en `localStorage`; las imágenes subidas son temporales.
 
 ## Panoramas 360° del Recorrido MVP
 
@@ -101,7 +178,7 @@ no reactiva un visor cerrado.
 En **Administrador → Espacios → Ver 360°** se puede consultar cualquier panorama,
 incluido el de fútbol 5 en mantenimiento. En estudiante solo aparecen canchas activas.
 
-Las imágenes cargadas mediante el formulario administrativo prevalecen durante la
+En la demostración, las imágenes cargadas mediante el formulario administrativo prevalecen durante la
 sesión de la página. No escriben en `public/`: después de recargar se recuperan los
 archivos demo. Los espacios nuevos sin archivo asociado deben volver a cargar su
 imagen. El visor conserva únicamente el panorama en uso y libera descargas/URLs al
@@ -111,7 +188,7 @@ cancelan descargas y callbacks, se descartan texturas tardías y se completa la
 destrucción cuando termina la carga pendiente, evitando reinicializar servicios ya
 destruidos. También se limpian las construcciones parciales si falla el constructor.
 
-### Integración futura con backend
+### Integración con backend
 
 `useSpacePanorama` consume el mismo cliente HTTP y el mismo contrato en ambos modos:
 
@@ -120,7 +197,7 @@ GET /spaces/{id}/images/PANORAMA
 Authorization: Bearer <token>
 ```
 
-- Con un token `demo:…`, `mockApi` devuelve la imagen subida temporalmente o descarga
+- Con demostración habilitada y un token `demo:…`, `mockApi` devuelve la imagen subida temporalmente o descarga
   el archivo local asociado. No necesita backend ni un CDN externo.
 - Con una sesión real, el cliente pide el binario al backend configurado mediante
   `VITE_API_URL`. La respuesta debe ser una imagen PNG/JPG/JPEG/WebP válida, no JSON ni HTML.
@@ -128,16 +205,39 @@ Authorization: Bearer <token>
   Los errores del backend **no** se ocultan usando fotografías demo.
 - La descarga usa Bearer y pasa al visor como URL `blob:`; el token nunca se incluye
   en la URL. Los archivos de `public/` son públicos y solo corresponden a la demo.
-- El backend deberá validar y persistir los archivos, admitir los contratos multipart
-  actuales y configurar CORS en despliegues con orígenes distintos. El visor no cambia.
+- El backend valida y persiste las imágenes en PostgreSQL (`space_image`), no en
+  Supabase Storage. La creación usa multipart y el reemplazo su endpoint de imágenes.
+  Configure CORS para despliegues con orígenes distintos. El visor no cambia.
 
 ### Comprobaciones
 
 ```bash
 npm test
+npm run test:integration
 npm run lint
 npm run build
 ```
 
-Las pruebas utilizan respuestas e imágenes simuladas en memoria; no añaden fotografías
-a `public/panoramas/`.
+`npm test` conserva Vitest para panoramas y pruebas React; `test:integration` ejecuta
+`node --test tests/*.test.js` con Vite, sin dependencias adicionales. Cubre configuración,
+demo, disciplinas, HTTP, multipart, errores de sesión y SSE. Estas pruebas controlan
+respuestas; por sí solas no acreditan conexión con una API real. No añaden fotografías
+a `public/panoramas/`. En el backend, `.\mvnw.cmd clean verify` requiere Java 25 y Docker
+y debe ejecutarse sin configuración de producción heredada, especialmente
+`SPRING_CONFIG_IMPORT`; Testcontainers proporciona servicios aislados.
+
+## Despliegue
+
+El [informe de integración](docs/integracion-backend.md) registra los archivos
+afectados, las verificaciones realizadas y sus limitaciones.
+
+- Compile con `VITE_DEMO_LOGIN=false`.
+- Use una `VITE_API_URL` pública HTTPS con CORS exacto en el backend, o un proxy
+  de producción `/api` que retire ese prefijo. El proxy de Vite solo existe en desarrollo.
+- Configure URLs públicas de contacto, cancelación y QR, y resuelva rutas SPA
+  al abrir directamente enlaces de correo o `/checkin/:spaceId`.
+- Desactive `dev` e inyecte secretos, PostgreSQL y SMTP desde el entorno seguro.
+- Permita SSE sin buffering ni timeouts incompatibles, y multipart hasta 30 MiB
+  por archivo y 64 MiB por solicitud.
+- SMTP institucional, navegación móvil y accesibilidad requieren aceptación en
+  el entorno real; esta integración no implementa SMTP externo ni Supabase Storage.
