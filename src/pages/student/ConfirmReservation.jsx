@@ -10,16 +10,27 @@ import Skeleton from '@/components/smoothui/skeleton'
 import PageHeader from '@/components/app/PageHeader'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
 import { api, errorMessage } from '@/lib/api'
-import { ACTIVE_STATES, formatDate, formatRange, toInstant } from '@/data/domain'
+import { ACTIVE_STATES, COUNTS_FOR_QUOTA, formatDate, formatRange, toInstant } from '@/data/domain'
 import { useApp } from '@/store'
 import { cn } from '@/lib/utils'
 
 // Conflictos de disponibilidad: se vuelve al calendario actualizado (RN-10, RN-42).
 const CONFLICT_CODES = ['SLOT_TAKEN', 'BLOCKED_SLOT', 'SPACE_IN_MAINTENANCE', 'OUTSIDE_BOOKING_WINDOW']
 
+/** Mensaje con el detalle de DAILY_QUOTA_EXCEEDED (RN-67: máximo diario fijo de 2 h). */
+const dailyQuotaMessage = (err) => {
+  const d = err.details ?? {}
+  return [
+    `El ${formatDate(d.date)} acumulas ${d.usedHours ?? 0} h de un máximo diario de ${d.dailyLimitHours ?? 2} h, entre todos los espacios.`,
+    d.availableHours > 0
+      ? `Puedes reservar hasta ${d.availableHours} h más ese día.`
+      : 'Ese día ya no admite más horas: elige otra fecha o el día siguiente.',
+  ].join(' ')
+}
+
 export default function ConfirmReservation() {
   const navigate = useNavigate()
-  const { draft: liveDraft, setDraft, createReservation, quota, reservations, me, disciplineById } =
+  const { draft: liveDraft, setDraft, createReservation, quota, reservations, me, disciplineById, settings } =
     useApp()
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState(null)
@@ -66,6 +77,11 @@ export default function ConfirmReservation() {
       r.startHour + r.hours > draft.startHour
   )
   const quotaOk = !quota || quota.left >= draft.hours
+  // RN-67: máximo diario fijo entre todos los espacios; el saldo definitivo lo calcula el servidor.
+  const dailyUsed = reservations
+    .filter((r) => r.date === draft.date && COUNTS_FOR_QUOTA.includes(r.estado))
+    .reduce((sum, r) => sum + r.hours, 0)
+  const dailyOk = dailyUsed + draft.hours <= settings.cuotaDiariaHoras
   const suspended = Boolean(me?.suspendedUntil && new Date(me.suspendedUntil) > new Date())
 
   const validations = [
@@ -73,6 +89,7 @@ export default function ConfirmReservation() {
     { label: 'Sin suspensión', ok: !suspended },
     { label: 'Sin solapamiento', ok: !overlaps },
     { label: 'Cuota suficiente', ok: quotaOk },
+    { label: 'Dentro del límite diario', ok: dailyOk },
   ]
   const allOk = validations.every((v) => v.ok)
 
@@ -219,6 +236,9 @@ export default function ConfirmReservation() {
             ) : (
               <Skeleton className="mt-3 h-14 w-full" />
             )}
+            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+              Límite diario: {settings.cuotaDiariaHoras} h por fecha, entre todos los espacios. (RN-67)
+            </p>
           </motion.section>
 
           <motion.section
@@ -253,14 +273,23 @@ export default function ConfirmReservation() {
       </div>
 
       {error && (
-        <Alert title="No se pudo crear la reserva" variant="destructive">
-          {errorMessage(error)}
+        <Alert
+          title={error.code === 'DAILY_QUOTA_EXCEEDED' ? 'Límite diario alcanzado' : 'No se pudo crear la reserva'}
+          variant={error.code === 'DAILY_QUOTA_EXCEEDED' ? 'warning' : 'destructive'}
+        >
+          {error.code === 'DAILY_QUOTA_EXCEEDED' ? dailyQuotaMessage(error) : errorMessage(error)}
         </Alert>
       )}
       {!quotaOk && (
         <Alert title="Sin cuota suficiente" variant="warning">
           Esta reserva necesita {draft.hours} h y solo te quedan {quota.left} h esta semana. La cuota se
           reinicia el lunes. (RN-18)
+        </Alert>
+      )}
+      {!dailyOk && (
+        <Alert title="Límite diario insuficiente" variant="warning">
+          Con esta reserva acumularías {dailyUsed + draft.hours} h el {formatDate(draft.date)} y el máximo
+          diario es {settings.cuotaDiariaHoras} h, entre todos los espacios. (RN-67)
         </Alert>
       )}
       {overlaps && (

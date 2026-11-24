@@ -24,6 +24,8 @@ const HOUR = 3_600_000
 const TOLERANCE_MIN = 10
 const LATE_MIN = 60
 const CHECKIN_OPENS_MIN = 10
+const CHECKIN_AFTER_END_MIN = 60
+const DAILY_HOURS = 2
 const MAX_DAYS = 6
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
 
@@ -62,6 +64,8 @@ const seedState = () => {
     ],
     reservations: [
       res('res-seed-1', SPACE_IDS.multiple1, today, 14, 'CONFIRMED', addDays(today, -1)),
+      // Consecutiva con res-seed-1: dos elegibles simultáneas para el flujo de selección (RN-33).
+      res('res-seed-4', SPACE_IDS.multiple1, today, 15, 'CONFIRMED', addDays(today, -1)),
       res('res-seed-2', SPACE_IDS.tennis1, addDays(today, -3), 15, 'COMPLETED', addDays(today, -5)),
       res('res-seed-3', SPACE_IDS.football11, addDays(today, -8), 18, 'NO_SHOW', addDays(today, -10)),
     ],
@@ -184,9 +188,9 @@ const reservationDto = (s, r) => ({
 
 const rulesDto = (s) => ({
   reservation: { slotMinutes: 60, maxSlotsPerReservation: 2, maxAdvanceDays: MAX_DAYS, minAdvanceMinutes: 0, bookingToleranceMinutes: TOLERANCE_MIN },
-  quota: { weeklyHours: s.params.weeklyHours, weekStartsOn: 'MONDAY', timeZone: 'America/Bogota' },
+  quota: { weeklyHours: s.params.weeklyHours, dailyHours: DAILY_HOURS, weekStartsOn: 'MONDAY', timeZone: 'America/Bogota' },
   cancellation: { lateThresholdMinutes: LATE_MIN },
-  checkIn: { opensMinutesBefore: CHECKIN_OPENS_MIN, closesAtReservationEnd: true },
+  checkIn: { opensMinutesBefore: CHECKIN_OPENS_MIN, closesAtReservationEnd: false, closesMinutesAfterEnd: CHECKIN_AFTER_END_MIN },
   reminder: { hoursBefore: 2 },
   sanctions: { noShowsForSuspension: s.params.noShows, window: 'CALENDAR_MONTH', suspensionDays: 7 },
   emailDomain: '@unimagdalena.edu.co',
@@ -390,6 +394,21 @@ route('POST', '/reservations', ({ s, user, body }) => {
   )
   if (overlaps) fail(409, 'OVERLAPPING_RESERVATION', 'Ya tienes una reserva que se solapa con esa franja.')
 
+  // RN-67: máximo diario fijo de 2 h por fecha en America/Bogota, entre todos los espacios;
+  // se valida antes de la cuota semanal y con los mismos estados de consumo.
+  const dailyUsed = s.reservations
+    .filter((r) => r.userId === user.id && COUNTS_FOR_QUOTA.includes(r.status) && bogotaParts(r.startAt).date === start.date)
+    .reduce((acc, r) => acc + resHours(r), 0)
+  if (dailyUsed + slots > DAILY_HOURS) {
+    fail(409, 'DAILY_QUOTA_EXCEEDED', `La reserva supera el máximo diario de ${DAILY_HOURS} horas.`, {
+      date: start.date,
+      dailyLimitHours: DAILY_HOURS,
+      usedHours: dailyUsed,
+      requestedHours: slots,
+      availableHours: Math.max(0, DAILY_HOURS - dailyUsed),
+    })
+  }
+
   const monday = mondayOf(start.date)
   const used = quotaUsed(s, user.id, monday)
   const limit = s.params.weeklyHours
@@ -479,17 +498,99 @@ route('POST', '/reservations/:id/cancellation', ({ s, user, params }) => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// Check-in (UC05): ventana desde opensMinutesBefore hasta endAt + 1 hora, inclusive.
+// ---------------------------------------------------------------------------
+
+const opensAtOf = (r) => {
+  const { date, hour, minute } = bogotaParts(new Date(r.startAt).getTime() - CHECKIN_OPENS_MIN * 60_000)
+  return toInstant(date, hour, minute)
+}
+const closesMsOf = (r) => new Date(r.endAt).getTime() + CHECKIN_AFTER_END_MIN * 60_000
+const closesAtOf = (r) => {
+  const { date, hour, minute } = bogotaParts(closesMsOf(r))
+  return toInstant(date, hour, minute)
+}
+
+/** Reservas propias `CONFIRMED` sin check-in dentro de la ventana, ordenadas por inicio. */
+const checkinEligible = (s, user, spaceId, now) =>
+  s.reservations
+    .filter((r) => r.userId === user.id && r.spaceId === spaceId)
+    .filter((r) => r.status === 'CONFIRMED' && !r.checkedInAt)
+    .filter((r) => now >= new Date(r.startAt).getTime() - CHECKIN_OPENS_MIN * 60_000 && now <= closesMsOf(r))
+    .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
+    .map((r) => ({
+      reservationId: r.id,
+      spaceId: r.spaceId,
+      startAt: r.startAt,
+      endAt: r.endAt,
+      opensAt: opensAtOf(r),
+      closesAt: closesAtOf(r),
+    }))
+
+/** Confirma por identificador revalidando usuario, espacio, estado y hora (RN-33, RN-36). */
+const confirmCheckin = (s, user, spaceId, reservationId, now) => {
+  const r =
+    s.reservations.find((x) => x.id === reservationId && x.spaceId === spaceId && x.userId === user.id) ??
+    fail(404, 'RESERVATION_NOT_FOUND', 'La reserva no existe o no corresponde a este espacio.')
+  if (r.checkedInAt) {
+    // Repetir conserva la fecha original y el estado actual, sin otra auditoría.
+    return { reservationId: r.id, spaceId: r.spaceId, status: r.status, checkedInAt: r.checkedInAt }
+  }
+  if (r.status !== 'CONFIRMED') {
+    if (r.status.startsWith('CANCELLED')) fail(409, 'RESERVATION_CANCELLED', 'La reserva fue cancelada.')
+    fail(409, 'CHECKIN_WINDOW_CLOSED', 'La reserva ya no admite el primer check-in.')
+  }
+  if (now < new Date(r.startAt).getTime() - CHECKIN_OPENS_MIN * 60_000) {
+    fail(409, 'CHECKIN_TOO_EARLY', 'El check-in aún no está disponible.', { opensAt: opensAtOf(r) })
+  }
+  if (now > closesMsOf(r)) {
+    fail(409, 'CHECKIN_WINDOW_CLOSED', 'La ventana de check-in cerró (cierre una hora después del fin, inclusive).')
+  }
+  const endMs = new Date(r.endAt).getTime()
+  const otherUsing = s.reservations.some(
+    (x) =>
+      x.userId !== user.id &&
+      x.spaceId === spaceId &&
+      ACTIVE.includes(x.status) &&
+      new Date(x.startAt).getTime() <= now &&
+      now < new Date(x.endAt).getTime()
+  )
+  // Antes del fin, la ocupación de otro usuario impide el check-in; una confirmación tardía no (RN-36).
+  if (now < endMs && otherUsing) {
+    fail(403, 'FORBIDDEN', 'Otro usuario tiene una reserva en curso y la tuya aún no ha terminado.')
+  }
+  r.status = now < endMs ? 'IN_USE' : 'COMPLETED'
+  r.checkedInAt = new Date().toISOString()
+  save()
+  return { reservationId: r.id, spaceId: r.spaceId, status: r.status, checkedInAt: r.checkedInAt }
+}
+
+route('GET', '/checkin/:spaceId/reservations', ({ s, user, params }) =>
+  checkinEligible(s, user, params.spaceId, Date.now())
+)
+
+route('POST', '/checkin/:spaceId/reservations/:reservationId', ({ s, user, params }) =>
+  confirmCheckin(s, user, params.spaceId, params.reservationId, Date.now())
+)
+
 route('POST', '/checkin/:spaceId', ({ s, user, params }) => {
   const now = Date.now()
+  const eligible = checkinEligible(s, user, params.spaceId, now)
+  if (eligible.length > 1) {
+    fail(409, 'CHECKIN_SELECTION_REQUIRED', 'Tienes varias reservas elegibles en este espacio; confirma la que corresponda.')
+  }
+  if (eligible.length === 1) return confirmCheckin(s, user, params.spaceId, eligible[0].reservationId, now)
+  // Fallback conservado para compatibilidad: repetir sobre una reserva activa con fin futuro.
   const mine = s.reservations
     .filter((r) => r.userId === user.id && r.spaceId === params.spaceId)
     .filter((r) => ACTIVE.includes(r.status) && new Date(r.endAt).getTime() > now)
     .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
   const r = mine[0] ?? fail(404, 'NO_ACTIVE_RESERVATION', 'No tienes una reserva activa en este espacio.')
-  if (r.status === 'IN_USE') return { reservationId: r.id, spaceId: r.spaceId, status: r.status, checkedInAt: r.checkedInAt }
+  if (r.checkedInAt) return { reservationId: r.id, spaceId: r.spaceId, status: r.status, checkedInAt: r.checkedInAt }
   const opens = new Date(r.startAt).getTime() - CHECKIN_OPENS_MIN * 60_000
   if (now < opens) {
-    fail(409, 'CHECKIN_TOO_EARLY', 'El check-in aún no está disponible.', { opensAt: new Date(opens).toISOString() })
+    fail(409, 'CHECKIN_TOO_EARLY', 'El check-in aún no está disponible.', { opensAt: opensAtOf(r) })
   }
   r.status = 'IN_USE'
   r.checkedInAt = new Date().toISOString()
