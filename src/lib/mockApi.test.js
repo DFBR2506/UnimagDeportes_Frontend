@@ -187,6 +187,104 @@ describe('check-in por identificador (UC05)', () => {
     }))
   }
 
+  it('lista dos reservas propias consecutivas y confirma cada una individualmente', async () => {
+    seedReservations([demoRes('res-a', 14, 15), demoRes('res-b', 15, 16)])
+    // 14:55: res-a ya abrió y res-b abre 14:50 → ambas elegibles a la vez.
+    vi.setSystemTime(new Date('2026-11-24T14:55:00-05:00'))
+
+    const list = await request(`/checkin/${SPACE}/reservations`)
+    expect(list.map((r) => r.reservationId)).toEqual(['res-a', 'res-b'])
+    expect(list[0]).toMatchObject({
+      spaceId: SPACE,
+      startAt: '2026-11-24T14:00:00-05:00',
+      opensAt: '2026-11-24T13:50:00-05:00',
+      closesAt: '2026-11-24T16:00:00-05:00',
+    })
+
+    // El endpoint antiguo ya no elige por el usuario: exige selección (RN-33).
+    const legacy = request(`/checkin/${SPACE}`, { method: 'POST' })
+    await expect(legacy).rejects.toMatchObject({ status: 409, code: 'CHECKIN_SELECTION_REQUIRED' })
+
+    const confirmed = await request(`/checkin/${SPACE}/reservations/res-a`, { method: 'POST' })
+    expect(confirmed).toMatchObject({ reservationId: 'res-a', status: 'IN_USE', checkedInAt: expect.any(String) })
+
+    // Tras confirmar, la lista se actualiza y solo queda la consecutiva.
+    const remaining = await request(`/checkin/${SPACE}/reservations`)
+    expect(remaining.map((r) => r.reservationId)).toEqual(['res-b'])
+  })
+
+  it('desde el fin responde COMPLETED y conserva la fecha al repetir', async () => {
+    seedReservations([demoRes('res-a', 14, 16)])
+    vi.setSystemTime(new Date('2026-11-24T16:30:00-05:00'))
+
+    const first = await request(`/checkin/${SPACE}/reservations/res-a`, { method: 'POST' })
+    expect(first.status).toBe('COMPLETED')
+
+    const repeat = await request(`/checkin/${SPACE}/reservations/res-a`, { method: 'POST' })
+    expect(repeat).toEqual(first)
+    expect(JSON.parse(storage.get('ud-demo-state-v1')).reservations[0].checkedInAt).toBe(first.checkedInAt)
+  })
+
+  it('acepta hasta el cierre inclusivo (fin + 1 h) y lo retira de la lista', async () => {
+    seedReservations([demoRes('res-a', 14, 16)])
+    vi.setSystemTime(new Date('2026-11-24T16:59:59-05:00'))
+
+    const list = await request(`/checkin/${SPACE}/reservations`)
+    expect(list.map((r) => r.reservationId)).toEqual(['res-a'])
+
+    const inside = await request(`/checkin/${SPACE}/reservations/res-a`, { method: 'POST' })
+    expect(inside.status).toBe('COMPLETED')
+
+    expect(await request(`/checkin/${SPACE}/reservations`)).toEqual([])
+  })
+
+  it('rechaza un instante posterior al cierre y no lista nada fuera de la ventana', async () => {
+    seedReservations([demoRes('res-b', 14, 16)])
+    vi.setSystemTime(new Date('2026-11-24T17:00:01-05:00'))
+
+    expect(await request(`/checkin/${SPACE}/reservations`)).toEqual([])
+    const pending = request(`/checkin/${SPACE}/reservations/res-b`, { method: 'POST' })
+    await expect(pending).rejects.toMatchObject({ status: 409, code: 'CHECKIN_WINDOW_CLOSED' })
+  })
+
+  it('rechaza antes de la apertura con la hora de apertura', async () => {
+    seedReservations([demoRes('res-a', 16, 17)])
+    vi.setSystemTime(new Date('2026-11-24T13:00:00-05:00'))
+
+    expect(await request(`/checkin/${SPACE}/reservations`)).toEqual([])
+    const pending = request(`/checkin/${SPACE}/reservations/res-a`, { method: 'POST' })
+    await expect(pending).rejects.toMatchObject({
+      status: 409,
+      code: 'CHECKIN_TOO_EARLY',
+      details: { opensAt: '2026-11-24T15:50:00-05:00' },
+    })
+  })
+
+  it('cada usuario solo ve y confirma las suyas', async () => {
+    seedReservations([demoRes('res-otra', 14, 15, { userId: 'otro-usuario' })])
+    vi.setSystemTime(new Date('2026-11-24T14:05:00-05:00'))
+
+    expect(await request(`/checkin/${SPACE}/reservations`)).toEqual([])
+    const pending = request(`/checkin/${SPACE}/reservations/res-otra`, { method: 'POST' })
+    await expect(pending).rejects.toMatchObject({ status: 404, code: 'RESERVATION_NOT_FOUND' })
+  })
+
+  it('otro usuario en curso bloquea el check-in anticipado, pero no la confirmación tardía', async () => {
+    seedReservations([
+      demoRes('res-otra', 14, 15, { userId: 'otro-usuario', status: 'IN_USE', checkedInAt: '2026-11-24T14:01:00-05:00' }),
+      demoRes('res-mia', 14, 15),
+      demoRes('res-tardia', 13, 14),
+    ])
+    vi.setSystemTime(new Date('2026-11-24T14:05:00-05:00'))
+
+    const early = request(`/checkin/${SPACE}/reservations/res-mia`, { method: 'POST' })
+    await expect(early).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+
+    // La reserva propia ya terminó: se confirma aunque otro usuario siga usando el espacio.
+    const late = await request(`/checkin/${SPACE}/reservations/res-tardia`, { method: 'POST' })
+    expect(late.status).toBe('COMPLETED')
+  })
+
   it('aplica el máximo diario fijo de 2 horas en la creación y lo declara en /rules', async () => {
     // random fijo: sleep determinista y sin el conflicto aleatorio del 12 % (RN-10).
     vi.spyOn(Math, 'random').mockReturnValue(0.5)

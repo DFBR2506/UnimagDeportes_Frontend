@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_SETTINGS, mapRules } from '@/data/domain'
+import { DEFAULT_SETTINGS, mapCheckinEligible, mapRules } from '@/data/domain'
 
 describe('mapRules', () => {
   it('aplica los máximos fijos cuando la API aún no los envía', () => {
@@ -35,5 +35,29 @@ describe('mapRules', () => {
     expect(DEFAULT_SETTINGS.cuotaDiariaHoras).toBe(2)
     expect(DEFAULT_SETTINGS.checkinCierraMinDespues).toBe(60)
     expect(DEFAULT_SETTINGS.checkinCierraAlFinal).toBe(false)
+  })
+})
+
+describe('mapCheckinEligible', () => {
+  it('convierte los instantes del DTO a la forma que usan las pantallas', () => {
+    const item = mapCheckinEligible({
+      reservationId: 'res-1',
+      spaceId: 'sp-1',
+      startAt: '2026-11-24T14:00:00-05:00',
+      endAt: '2026-11-24T16:00:00-05:00',
+      opensAt: '2026-11-24T13:50:00-05:00',
+      closesAt: '2026-11-24T17:00:00-05:00',
+    })
+    expect(item).toEqual({
+      id: 'res-1',
+      spaceId: 'sp-1',
+      date: '2026-11-24',
+      startHour: 14,
+      hours: 2,
+      startAt: '2026-11-24T14:00:00-05:00',
+      endAt: '2026-11-24T16:00:00-05:00',
+      opensAt: '2026-11-24T13:50:00-05:00',
+      closesAt: '2026-11-24T17:00:00-05:00',
+    })
   })
 })

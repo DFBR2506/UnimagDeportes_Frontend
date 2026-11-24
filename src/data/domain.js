@@ -192,6 +192,22 @@ export const mapQuota = (q) => ({
   resetAt: q.resetAt,
 })
 
+/** Reserva elegible de GET /checkin/{spaceId}/reservations → forma de la UI. */
+export const mapCheckinEligible = (r) => {
+  const start = bogotaParts(r.startAt)
+  return {
+    id: r.reservationId,
+    spaceId: r.spaceId,
+    date: start.date,
+    startHour: start.hour,
+    hours: Math.max(1, Math.round((new Date(r.endAt) - new Date(r.startAt)) / 3_600_000)),
+    startAt: r.startAt,
+    endAt: r.endAt,
+    opensAt: r.opensAt,
+    closesAt: r.closesAt,
+  }
+}
+
 /** Máximo diario fijo y cierre del check-in según el contrato de GET /rules. */
 const DAILY_HOURS = 2
 const CHECKIN_CLOSES_AFTER_MIN = 60
