@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:integration": "node --test tests/*.test.js",
+    "test:browser:blocks": "node tests/browser-blocks.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

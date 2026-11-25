@@ -102,10 +102,20 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
     throw error
   }
   if (res.status === 204) return null
-  if (as === 'text') return res.text()
-  if (as === 'blob') return res.blob()
-  const text = await res.text()
-  return text ? JSON.parse(text) : null
+  try {
+    if (as === 'text') return await res.text()
+    if (as === 'blob') return await res.blob()
+    const text = await res.text()
+    return text ? JSON.parse(text) : null
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err
+    // Las cabeceras pueden llegar antes de perderse el cuerpo. Una mutación
+    // pudo persistirse: conservar el resultado incierto para un reintento seguro.
+    throw new ApiError(0, {
+      code: 'RESPONSE_READ_ERROR',
+      message: 'No se pudo leer la respuesta del servidor. Intenta de nuevo.',
+    })
+  }
 }
 
 /**
@@ -113,7 +123,7 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
  * token nunca va en la URL). Llama a `onEvent(name, data)` por cada evento.
  * Devuelve una función para cerrar el flujo.
  */
-export function openEventStream(path, onEvent) {
+export function openEventStream(path, onEvent, { onConnect } = {}) {
   if (DEMO_ENABLED && isDemoToken(token)) return () => {} // sin backend no hay flujo en vivo
   const requestToken = token
   const controller = new AbortController()
@@ -127,8 +137,11 @@ export function openEventStream(path, onEvent) {
         if (!res.ok || !res.body) {
           const error = await parseError(res)
           if (requestToken === token && (res.status === 401 || error.code === 'PROFILE_INCOMPLETE')) emit(error)
+          if (res.status >= 500 || res.status === 429 || (res.ok && !res.body)) throw error
           return
         }
+        if (controller.signal.aborted || requestToken !== token) return
+        onConnect?.()
         const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
         let buffer = ''
         for (;;) {

@@ -10,7 +10,8 @@ import { toast } from '@/components/smoothui/toast'
 import SpacePanorama from '@/components/app/SpacePanorama'
 import WeekCalendar from '@/components/app/WeekCalendar'
 import { EASE } from '@/lib/anim'
-import { errorMessage, openEventStream } from '@/lib/api'
+import { errorMessage } from '@/lib/api'
+import useAvailabilityRevision from '@/lib/useAvailabilityRevision'
 import {
   addDays,
   bogotaParts,
@@ -109,6 +110,7 @@ export default function CourtSchedule() {
   const { me, isAdmin, spaces, spacesLoaded, settings, setDraft, disciplineById, fetchAvailability } =
     useApp()
   const space = spaces.find((s) => s.id === spaceId)
+  const availabilityRevision = useAvailabilityRevision(space?.id)
 
   const today = todayISO()
   const maxDate = addDays(today, settings.anticipacionMaxDias) // horizonte de 7 días (OQ-09)
@@ -139,6 +141,7 @@ export default function CourtSchedule() {
       )
     )
       .then((entries) => {
+        if (controller.signal.aborted) return
         setSlotsByDate(Object.fromEntries(entries))
         setUpdatedAt(new Date())
         setLoading(false)
@@ -151,15 +154,7 @@ export default function CourtSchedule() {
     return () => controller.abort()
     // fetchAvailability depende de las reservas propias; se recarga con reloadKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [space?.id, daysKey, activeDiscipline, reloadKey])
-
-  // Tiempo real: el servidor avisa por SSE y el cliente vuelve a pedir el calendario.
-  useEffect(() => {
-    if (!space?.id) return
-    return openEventStream(`/spaces/${space.id}/availability/stream`, (name) => {
-      if (name === 'availability-changed') setReloadKey((k) => k + 1)
-    })
-  }, [space?.id])
+  }, [space?.id, daysKey, activeDiscipline, reloadKey, availabilityRevision])
 
   // Si la franja elegida dejó de estar libre tras una actualización, se descarta.
   useEffect(() => {

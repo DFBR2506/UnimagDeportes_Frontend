@@ -144,7 +144,7 @@ const covers = (r, date, hour) => {
 
 /** Estado de una franja combinando bloqueos, reservas y la ocupación simulada. */
 const slotInfo = (s, spaceId, date, hour) => {
-  const block = s.blocks.find((b) => b.spaceId === spaceId && b.date === date && hour >= b.startHour && hour < b.endHour)
+  const block = s.blocks.map(blockDto).find((b) => b.spaceId === spaceId && b.status === 'ACTIVE' && covers(b, date, hour))
   if (block) return { status: 'BLOCKED', reason: block.reason }
   const res = s.reservations.find((r) => r.spaceId === spaceId && ACTIVE.includes(r.status) && covers(r, date, hour))
   if (res) return { status: 'OCCUPIED', reservationId: res.id }
@@ -224,6 +224,23 @@ const committed = (s, equipmentId, startMs, endMs, ignoreId) => {
 }
 
 const equipmentDto = (e) => ({ id: e.id, name: e.name, discipline: e.discipline, stock: e.stock, status: e.status })
+
+// Admite los bloqueos guardados por versiones anteriores de la demo sin borrarlos.
+const blockDto = (block) => ({
+  id: block.id,
+  spaceId: block.spaceId,
+  type: block.type,
+  reason: block.reason,
+  startAt: block.startAt ?? toInstant(block.date, block.startHour),
+  endAt: block.endAt ?? (block.endHour === 24
+    ? toInstant(addDays(block.date, 1), 0)
+    : toInstant(block.date, block.endHour)),
+  recurrenceGroup: block.recurrenceGroup ?? null,
+  status: block.status ?? 'ACTIVE',
+  cancelledAt: block.cancelledAt ?? null,
+  cancelledBy: block.cancelledBy ?? null,
+  cancellationReason: block.cancellationReason ?? null,
+})
 
 /** QR decorativo y determinista por espacio (el prototipo no codifica datos reales). */
 const qrSvg = (spaceId) => {
@@ -795,6 +812,47 @@ route('GET', '/admin/indicators', ({ s, query }) => {
   }
 })
 
+route('GET', '/admin/blocks', ({ s, query }) => {
+  const fields = {}
+  const from = Date.parse(query.from)
+  const to = Date.parse(query.to)
+  const withOffset = (value) => /T.+(?:Z|[+-]\d{2}:\d{2})$/.test(value ?? '')
+  if (!query.spaceId) fields.spaceId = 'obligatorio'
+  if (!Number.isFinite(from) || !withOffset(query.from)) fields.from = 'instante con offset obligatorio'
+  if (!Number.isFinite(to) || !withOffset(query.to) || to <= from) fields.to = 'debe ser posterior a from'
+  if (query.status && !['ACTIVE', 'CANCELLED'].includes(query.status)) fields.status = 'valor inválido'
+  const page = Number(query.page ?? 0)
+  const size = Number(query.size ?? 20)
+  if (!Number.isInteger(page) || page < 0) fields.page = 'no negativo'
+  if (!Number.isInteger(size) || size < 1 || size > 100) fields.size = 'entre 1 y 100'
+  if (Object.keys(fields).length) invalid(fields)
+  getSpace(s, query.spaceId)
+  const matches = s.blocks.map(blockDto)
+    .filter((block) => block.spaceId === query.spaceId &&
+      Date.parse(block.startAt) < to && Date.parse(block.endAt) > from &&
+      (!query.status || block.status === query.status))
+    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt) || a.id.localeCompare(b.id))
+  return { items: matches.slice(page * size, (page + 1) * size), page, size, totalElements: matches.length }
+})
+
+route('POST', '/admin/blocks/:id/cancellation', ({ s, params, body, user }) => {
+  const reason = typeof body?.reason === 'string' ? body.reason.trim() : ''
+  if (!reason || Array.from(reason).length > 1000) invalid({ reason: 'entre 1 y 1000 caracteres' })
+  const block = s.blocks.find((item) => item.id === params.id) ??
+    fail(404, 'BLOCK_NOT_FOUND', 'El bloqueo no existe.')
+  const original = blockDto(block)
+  if (original.status === 'CANCELLED') return original
+  if (Date.now() >= Date.parse(original.endAt)) {
+    fail(409, 'BLOCK_NOT_CANCELLABLE', 'El bloqueo ya terminó y no se puede cancelar.')
+  }
+  Object.assign(block, {
+    status: 'CANCELLED', cancelledAt: new Date().toISOString(),
+    cancelledBy: user.id, cancellationReason: reason,
+  })
+  save()
+  return blockDto(block)
+})
+
 route('POST', '/admin/blocks', ({ s, body }) => {
   const space = getSpace(s, body?.spaceId)
   const fields = {}
@@ -829,12 +887,20 @@ route('POST', '/admin/blocks', ({ s, body }) => {
   affected.forEach((r) => {
     r.status = 'CANCELLED_BY_ADMIN'
   })
+  const recurrenceGroup = rec ? crypto.randomUUID() : null
   for (const date of dates) {
-    s.blocks.push({ id: newId('blk'), spaceId: space.id, date, startHour: start.hour, endHour, reason: body.reason.trim(), type: body.type })
+    for (let hour = start.hour; hour < endHour; hour++) {
+      s.blocks.push({
+        id: crypto.randomUUID(), spaceId: space.id, type: body.type, reason: body.reason.trim(),
+        startAt: toInstant(date, hour),
+        endAt: hour === 23 ? toInstant(addDays(date, 1), 0) : toInstant(date, hour + 1),
+        recurrenceGroup, status: 'ACTIVE', cancelledAt: null, cancelledBy: null, cancellationReason: null,
+      })
+    }
   }
   save()
   return {
-    recurrenceGroup: rec ? crypto.randomUUID() : null,
+    recurrenceGroup,
     createdBlocks: dates.length * (endHour - start.hour),
     cancelledReservations: affected.length,
   }

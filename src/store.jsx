@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { api, getToken, onSessionProblem, setToken } from '@/lib/api'
 import ReauthDialog from '@/components/app/ReauthDialog'
 import {
@@ -13,6 +13,9 @@ import {
 } from '@/data/domain'
 
 const AppContext = createContext(null)
+
+const reauthCancelled = () =>
+  Object.assign(new Error('Reautenticación cancelada'), { code: 'REAUTH_CANCELLED' })
 
 /**
  * Estado compartido de la sesión contra la API real:
@@ -34,8 +37,14 @@ export function AppProvider({ children }) {
   const [quota, setQuota] = useState(null)
   const [draft, setDraft] = useState(null)
   const [reauth, setReauth] = useState(null) // { resolve, reject } mientras se pide el código
+  const pendingReauth = useRef(null)
+  const sessionVersion = useRef(0)
 
   const clearSession = useCallback(() => {
+    sessionVersion.current += 1
+    pendingReauth.current?.reject(reauthCancelled())
+    pendingReauth.current = null
+    setReauth(null)
     setToken(null)
     setTokenState(null)
     setMe(null)
@@ -126,15 +135,21 @@ export function AppProvider({ children }) {
   }, [refreshRules, refreshSpaces, refreshReservations, refreshQuota])
 
   // Datos base una vez que el perfil está completo.
+  // El OTP rota el token de la misma sesión: no desmontar los formularios
+  // mediante otra carga inicial. Cada consulta/flujo renueva su Bearer.
   const ready = Boolean(me && !me.needsName)
   useEffect(() => {
     if (!ready) return
     refreshData()
-  }, [ready, token, refreshData])
+  }, [ready, me?.id, refreshData])
 
   // ---------------------------------------------------------------- acceso (UC01)
 
   const startSession = async (newToken) => {
+    sessionVersion.current += 1
+    pendingReauth.current?.reject(reauthCancelled())
+    pendingReauth.current = null
+    setReauth(null)
     setToken(newToken)
     setTokenState(newToken)
     setSessionNotice(null)
@@ -176,28 +191,53 @@ export function AppProvider({ children }) {
 
   /** Ejecuta `fn`; si la API exige reautenticación, pide el código y reintenta una vez. */
   const withReauth = async (fn) => {
+    const version = sessionVersion.current
+    const assertSession = () => {
+      if (version !== sessionVersion.current) throw reauthCancelled()
+    }
     try {
-      return await fn()
+      const result = await fn()
+      assertSession()
+      return result
     } catch (err) {
+      assertSession()
       if (err?.code !== 'REAUTH_REQUIRED') throw err
-      await new Promise((resolve, reject) => setReauth({ resolve, reject }))
-      return fn()
+      if (!pendingReauth.current) {
+        let resolve, reject
+        const promise = new Promise((done, fail) => { resolve = done; reject = fail })
+        const pending = { promise, resolve, reject, token: getToken() }
+        pendingReauth.current = pending
+        setReauth(pending)
+      }
+      await pendingReauth.current.promise
+      assertSession()
+      const result = await fn()
+      assertSession()
+      return result
     }
   }
 
   const onReauthenticated = (newToken) => {
+    const pending = pendingReauth.current
+    if (!pending || pending.token !== getToken()) return
     setToken(newToken)
     setTokenState(newToken)
-    reauth?.resolve()
+    pending.resolve()
+    pendingReauth.current = null
     setReauth(null)
   }
 
   const onReauthCancel = () => {
-    const err = new Error('Reautenticación cancelada')
-    err.code = 'REAUTH_CANCELLED'
-    reauth?.reject(err)
+    pendingReauth.current?.reject(reauthCancelled())
+    pendingReauth.current = null
     setReauth(null)
   }
+
+  useEffect(() => () => {
+    sessionVersion.current += 1
+    pendingReauth.current?.reject(reauthCancelled())
+    pendingReauth.current = null
+  }, [])
 
   // ---------------------------------------------------------------- consultas
 

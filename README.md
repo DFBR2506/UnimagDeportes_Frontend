@@ -97,8 +97,17 @@ accesible desde la red y configuración correspondiente.
   (`/checkin/:espacio`, con ventana real).
 - **Administrador:** inicia sesión con una cuenta cuyo rol sea `ADMIN` y entra por «Modo administrador»:
   panel de ocupación, espacios y franjas (crear/editar), bloqueos institucionales
-  (cancelan reservas afectadas — RN-43), configuración de reglas (se refleja en toda la
-  app) y generación de QR por espacio.
+  (cancelan reservas afectadas — RN-43), consulta paginada de bloqueos e historial de
+  cancelaciones, configuración de reglas (se refleja en toda la app) y generación de
+  QR por espacio.
+
+En **Administrador → Bloqueos**, el historial se filtra por espacio, fechas incluidas
+y estado. «No cancelado» también incluye franjas finalizadas. La cancelación selecciona
+el ID de `GET /admin/blocks`, no el motivo del calendario; exige motivo y reautenticación
+reciente. Solo admite una primera cancelación antes del fin de la franja. El historial
+conserva los datos originales y muestra UUID del administrador, fecha y motivo de
+cancelación. Cancelar no reactiva reservas, no cancela toda una recurrencia ni levanta
+el mantenimiento; la disponibilidad y la ocupación se vuelven a consultar.
 
 La API es la autoridad para permisos, cuota, disponibilidad, stock y sanciones.
 Usa UUID y fechas de `America/Bogota`; el calendario abarca hoy…hoy + 6 inclusive.
@@ -214,6 +223,7 @@ Authorization: Bearer <token>
 ```bash
 npm test
 npm run test:integration
+npm run test:browser:blocks
 npm run lint
 npm run build
 ```
@@ -225,6 +235,14 @@ respuestas; por sí solas no acreditan conexión con una API real. No añaden fo
 a `public/panoramas/`. En el backend, `.\mvnw.cmd clean verify` requiere Java 25 y Docker
 y debe ejecutarse sin configuración de producción heredada, especialmente
 `SPRING_CONFIG_IMPORT`; Testcontainers proporciona servicios aislados.
+
+`test:browser:blocks` inicia Vite y una API de prueba aislada, y usa Chrome headless
+en escritorio (1440 × 1000) y móvil emulado (390 × 844). En Windows busca Chrome en
+`C:\Program Files\Google\Chrome\Application\chrome.exe`; `CHROME_PATH` permite indicar
+otro binario. En otros sistemas requiere además `TMPDIR`. Comprueba confirmación,
+OTP, errores, reintento idempotente, historial, filtros, foco de teclado y SSE. Guarda
+capturas en el directorio temporal y elimina su perfil de Chrome al terminar. No usa
+datos reales ni acredita por sí solo integración con Spring Boot o accesibilidad completa.
 
 ## Despliegue
 

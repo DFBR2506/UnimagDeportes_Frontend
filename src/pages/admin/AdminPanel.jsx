@@ -14,6 +14,7 @@ import WeekCalendar from '@/components/app/WeekCalendar'
 import CourtArt, { courtKind } from '@/components/app/CourtArt'
 import useAdminSpaces from '@/lib/useAdminSpaces'
 import useSpaceImage from '@/lib/useSpaceImage'
+import useAvailabilityRevision from '@/lib/useAvailabilityRevision'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
 import { api, errorMessage } from '@/lib/api'
 import { addDays, bogotaParts, formatHour, mapSlot, mondayOf, todayISO } from '@/data/domain'
@@ -139,6 +140,7 @@ export default function AdminPanel() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const activeId = spaceId ?? spaces[0]?.id
+  const availabilityRevision = useAvailabilityRevision(activeId)
   const space = spaces.find((s) => s.id === activeId)
   const today = todayISO()
   const thisMonday = mondayOf(today)
@@ -165,6 +167,7 @@ export default function AdminPanel() {
       )
     )
       .then((entries) => {
+        if (controller.signal.aborted) return
         setSlotsByDate(Object.fromEntries(entries))
         setLoading(false)
       })
@@ -176,7 +179,7 @@ export default function AdminPanel() {
     return () => controller.abort()
     // `days` se deriva de `monday`
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, monday, reloadKey])
+  }, [activeId, monday, reloadKey, availabilityRevision])
 
   const describe = (run) =>
     run.estado === 'bloqueada'

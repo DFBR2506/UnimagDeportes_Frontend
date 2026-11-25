@@ -129,3 +129,62 @@ prueba no devolvió recursos.
 - Sin desviaciones funcionales deliberadas respecto de la guía; se conservó Vitest
   y se añadió un ejecutor separado para las pruebas nativas.
 - Es recomendable una revisión posterior con `@auditor`; no se lanzó un subagente.
+
+## Ampliación: cancelación de bloqueos — 25 de noviembre de 2026
+
+Se incorporó la consulta administrativa de `GET /admin/blocks` y la cancelación
+individual mediante `POST /admin/blocks/{id}/cancellation`, conforme a los
+[contratos de bloqueos](../../Unimag-Deportes/docs/techincal-plan/contracts/blocks/GET-admin-blocks.md)
+y [cancelación](../../Unimag-Deportes/docs/techincal-plan/contracts/blocks/POST-admin-blocks-id-cancellation.md).
+No se modificó el backend.
+
+- `AdminBlocks` conserva la creación y sustituye los resúmenes de sesión por
+  `AdminBlockHistory`: filtros, paginación base cero, estados e historial persistido.
+  Las fechas de la interfaz incluyen ambos días y se traducen a `[from, to)` con
+  offset de Bogotá. Las acciones usan el ID de la fila, nunca el motivo del calendario.
+- La confirmación identifica espacio, inicio, fin e ID; exige motivo de 1–1000
+  puntos de código tras recortar espacios. El historial muestra el UUID del
+  administrador, sin resolver nombres o correos.
+- `ACTIVE` se presenta como «No cancelado», incluso si terminó. La primera
+  cancelación solo se ofrece antes del fin, y se gestionan las negativas del servidor.
+  Se advierte que no se reactivan reservas, no se cancela la recurrencia ni se levanta
+  mantenimiento.
+- `store.jsx` reutiliza el flujo OTP sin recargar los datos iniciales al rotar el
+  token de la misma sesión; conserva el formulario y reintenta una vez. El diálogo
+  descarta respuestas tardías al cerrar y evita verificaciones simultáneas.
+- Se bloquean envíos duplicados. Ante un resultado incierto se conserva el motivo
+  para repetir por el mismo ID, incluso tras el fin. Un `200` idempotente muestra
+  la cancelación original y también invalida las consultas sin esperar otro SSE.
+- `availabilityEvents` y `useAvailabilityRevision` invalidan listado, calendario
+  y ocupación visibles. Las vistas desmontadas consultan al abrirse. SSE se renueva
+  con el token y resincroniza al conectar/reconectar; los errores HTTP transitorios
+  429/5xx también permiten reconexión. No se transforma una franja en libre localmente.
+- `mockApi.js` incorpora consulta, historial y cancelación idempotente; las nuevas
+  creaciones generan una fila por hora. Los bloqueos de versiones anteriores de la
+  demo se conservan.
+
+### Verificación de la ampliación
+
+Estos resultados no sustituyen los resultados históricos del 17 de noviembre:
+
+| Comando | Resultado |
+| --- | --- |
+| `npm test` | 139 pruebas aprobadas y dos fallidas preexistentes en `src/pages/student/CheckIn.test.jsx:163,175`; las 24 pruebas nuevas pasan. |
+| `npm run test:integration` | 17 pruebas aprobadas, incluidas consulta, solape, paginación, cancelación e invariantes de la demo. |
+| `npm run test:browser:blocks` | Recorridos de escritorio y móvil emulado aprobados con Chrome headless y API controlada. |
+| `npm run build` | Correcto; conserva advertencia por bundles mayores de 500 kB. |
+| `npm run lint` | Sin errores, con advertencias React existentes y una de efecto de carga en `AdminBlockHistory`. |
+| `git diff --check` | Sin errores de whitespace; advertencias de conversión LF/CRLF. |
+
+El recorrido de navegador comprueba motivo/confirmación, OTP inválido y válido con
+token renovado, respuesta 503 después de registrar la cancelación y repetición sin
+otra transición, historial con UUID, filtros de estado, error 409, actualización de
+ocupación por SSE y consulta de una disponibilidad que sigue bloqueada. También
+comprueba ausencia de desbordamiento horizontal, foco de teclado dentro del diálogo,
+retorno al historial y ausencia de excepciones JavaScript. Las capturas se guardan
+en el directorio temporal indicado por el script.
+
+**Límites:** la API de navegador es controlada, no Spring Boot. No se ejecutaron
+cancelaciones contra datos reales ni se acredita aceptación en dispositivos físicos,
+lector de pantalla, accesibilidad completa o despliegue. Los dos fallos de Check-in
+se observaron antes de implementar y no se corrigieron en este alcance.
