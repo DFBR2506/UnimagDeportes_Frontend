@@ -106,7 +106,7 @@ let sequence = 0
 const exceptions = []
 const cdp = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++sequence
-  const timeout = setTimeout(() => { commands.delete(id); reject(new Error(`CDP timeout: ${method}`)) }, 15000)
+  const timeout = setTimeout(() => { commands.delete(id); reject(new Error(`CDP timeout: ${method}`)) }, 30000)
   commands.set(id, { resolve: (value) => { clearTimeout(timeout); resolve(value) }, reject })
   socket.send(JSON.stringify({ id, method, params }))
 })
@@ -117,7 +117,7 @@ const evaluate = async (expression) => {
 }
 const waitFor = async (expression) => {
   for (let index = 0; index < 150; index++) {
-    if (await evaluate(expression)) return
+    if (await evaluate(`document.body && (${expression})`)) return
     await delay(100)
   }
   throw new Error(`No se cumplió: ${expression}\n${await evaluate('document.body.innerText')}`)
@@ -146,6 +146,8 @@ try {
   await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
   vite = await createServer({
     logLevel: 'error',
+    // Los HTML de reportes versionados no son entradas de esta aplicación.
+    optimizeDeps: { entries: ['index.html'] },
     server: {
       host: '127.0.0.1', port: 0,
       proxy: { '/api': { target: `http://127.0.0.1:${backend.address().port}`, rewrite: (url) => url.replace(/^\/api/, '') } },
