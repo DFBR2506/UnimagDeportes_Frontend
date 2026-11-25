@@ -127,3 +127,27 @@ test('respuestas tardías de otra sesión no invalidan la actual', async (t) => 
   await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(problems, [])
 })
+
+test('HTTP: normaliza cuerpos truncados o ilegibles y conserva los abortos explícitos', async (t) => {
+  const { load } = await client(t)
+  const { api, setToken } = await load('lib/api.js')
+  setToken('read-response-token')
+  for (const as of ['json', 'text', 'blob']) {
+    globalThis.fetch = async () => new Response(new ReadableStream({
+      start(controller) {
+        controller.error(new TypeError('La conexión se perdió durante el cuerpo'))
+      },
+    }), { status: 200 })
+    await assert.rejects(api('/admin/blocks/id/cancellation', {
+      method: 'POST', body: { reason: 'Motivo original' }, as,
+    }), { status: 0, code: 'RESPONSE_READ_ERROR' })
+  }
+  globalThis.fetch = async () => new Response('{"id":', { status: 200 })
+  await assert.rejects(api('/admin/blocks'), { status: 0, code: 'RESPONSE_READ_ERROR' })
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.error(new DOMException('Solicitud abortada', 'AbortError'))
+    },
+  }), { status: 200 })
+  await assert.rejects(api('/admin/blocks'), { name: 'AbortError' })
+})

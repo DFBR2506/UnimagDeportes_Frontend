@@ -126,6 +126,37 @@ it('reintenta con el mismo motivo después de un resultado incierto, incluso tra
     .toEqual([{ reason: 'Original' }, { reason: 'Original' }])
 })
 
+it('conserva el reintento tras perder el cuerpo HTTP 200 y finalizar la franja', async () => {
+  const actual = await vi.importActual('@/lib/api')
+  let now = Date.parse(block.endAt) - 1000
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(new Response(new ReadableStream({
+      start(controller) { controller.error(new TypeError('Cuerpo interrumpido')) },
+    }), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ...block, status: 'CANCELLED', cancellationReason: 'Motivo antes del fin' })))
+  vi.stubGlobal('fetch', fetch)
+  http.api.mockImplementation((path, options) => path.endsWith('/cancellation')
+    ? actual.api(path, options)
+    : Promise.resolve(page()))
+  try {
+    renderHistory()
+    await openCancellation()
+    const input = screen.getByLabelText('Motivo de cancelación')
+    fireEvent.change(input, { target: { value: 'Motivo antes del fin' } })
+    fireEvent.click(confirm())
+    await screen.findByText('No se pudo leer la respuesta del servidor. Intenta de nuevo.')
+    expect(input.readOnly).toBe(true)
+    now += 2000
+    fireEvent.click(confirm())
+    await screen.findByText(/Motivo registrado: Motivo antes del fin/)
+    expect(fetch.mock.calls.map(([, options]) => JSON.parse(options.body)))
+      .toEqual([{ reason: 'Motivo antes del fin' }, { reason: 'Motivo antes del fin' }])
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
 it.each([
   [404, 'BLOCK_NOT_FOUND'],
   [409, 'BLOCK_NOT_CANCELLABLE'],

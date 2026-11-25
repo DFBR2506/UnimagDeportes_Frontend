@@ -102,10 +102,20 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
     throw error
   }
   if (res.status === 204) return null
-  if (as === 'text') return res.text()
-  if (as === 'blob') return res.blob()
-  const text = await res.text()
-  return text ? JSON.parse(text) : null
+  try {
+    if (as === 'text') return await res.text()
+    if (as === 'blob') return await res.blob()
+    const text = await res.text()
+    return text ? JSON.parse(text) : null
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err
+    // Las cabeceras pueden llegar antes de perderse el cuerpo. Una mutación
+    // pudo persistirse: conservar el resultado incierto para un reintento seguro.
+    throw new ApiError(0, {
+      code: 'RESPONSE_READ_ERROR',
+      message: 'No se pudo leer la respuesta del servidor. Intenta de nuevo.',
+    })
+  }
 }
 
 /**
