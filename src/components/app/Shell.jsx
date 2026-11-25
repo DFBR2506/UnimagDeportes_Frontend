@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import {
   CalendarDays,
   ChevronDown,
@@ -162,6 +162,9 @@ export default function Shell({ variant = 'student' }) {
   const { token, session, logout, isAdmin, sessionNotice, sessionError, retrySession, dataError, dataLoaded, refreshData } = useApp()
   const navigate = useNavigate()
   const location = useLocation()
+  // useOutlet captura el elemento actual: la página saliente conserva su contenido durante la transición
+  // (con <Outlet /> mostraría ya la ruta nueva y se montaría dos veces).
+  const outlet = useOutlet()
   const [contactOpen, setContactOpen] = useState(false)
 
   // Sin token: al acceso, recordando el destino (RN-34, RN-56: tras vencer, se vuelve a la pantalla de origen).
@@ -272,7 +275,7 @@ export default function Shell({ variant = 'student' }) {
             >
               {dataError || !dataLoaded ? (
                 <ConnectionState error={dataError} onRetry={refreshData} label="Cargando datos" retryLabel="Reintentar" />
-              ) : <Outlet />}
+              ) : outlet}
             </motion.div>
           </AnimatePresence>
         </main>
