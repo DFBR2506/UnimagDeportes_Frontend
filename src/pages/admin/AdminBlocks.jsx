@@ -6,9 +6,10 @@ import Input from '@/components/smoothui/input'
 import Field, { FieldDescription, FieldLabel } from '@/components/smoothui/field'
 import ToggleGroupRoot, { ToggleGroupItem } from '@/components/smoothui/toggle-group'
 import SmoothButton from '@/components/smoothui/smooth-button'
-import Badge from '@/components/smoothui/badge'
 import { toast } from '@/components/smoothui/toast'
 import PageHeader from '@/components/app/PageHeader'
+import AdminBlockHistory from '@/components/app/AdminBlockHistory'
+import { notifyAvailabilityChanged } from '@/lib/availabilityEvents'
 import useAdminSpaces from '@/lib/useAdminSpaces'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
 import { errorMessage, api } from '@/lib/api'
@@ -16,9 +17,7 @@ import {
   BLOCK_TYPES,
   WEEK_DAYS,
   addDays,
-  formatDate,
   formatHour,
-  formatRange,
   toInstant,
   todayISO,
 } from '@/data/domain'
@@ -26,7 +25,7 @@ import { useApp } from '@/store'
 
 export default function AdminBlocks() {
   const { withReauth } = useApp()
-  const { spaces } = useAdminSpaces()
+  const { spaces, loaded, error: spacesError, reload } = useAdminSpaces()
   const [spaceId, setSpaceId] = useState(null)
   const [type, setType] = useState('CLASS')
   const [date, setDate] = useState(todayISO())
@@ -37,7 +36,6 @@ export default function AdminBlocks() {
   const [days, setDays] = useState([])
   const [until, setUntil] = useState(addDays(todayISO(), 30))
   const [saving, setSaving] = useState(false)
-  const [created, setCreated] = useState([]) // bloqueos creados en esta sesión (la API no los lista)
 
   const space = spaces.find((s) => s.id === (spaceId ?? spaces[0]?.id))
   const hours = space ? Array.from({ length: space.close - space.open }, (_, i) => space.open + i) : []
@@ -69,10 +67,7 @@ export default function AdminBlocks() {
             ? `${res.createdBlocks} franja(s) bloqueadas · ${res.cancelledReservations} reserva(s) cancelada(s) por administrador.`
             : `${res.createdBlocks} franja(s) bloqueadas.`,
       })
-      setCreated((prev) => [
-        { ...body, spaceName: space.name, date, start, end, recurrent, ...res, key: Date.now() },
-        ...prev,
-      ])
+      notifyAvailabilityChanged(space.id)
       setReason('')
     } catch (err) {
       if (err.code !== 'REAUTH_CANCELLED') {
@@ -86,8 +81,8 @@ export default function AdminBlocks() {
   return (
     <div className="space-y-6 md:space-y-8">
       <PageHeader
-        title="Bloquear franjas"
-        subtitle="Los bloqueos tienen prioridad sobre las reservas futuras."
+        title="Bloqueos de espacios"
+        subtitle="Crea bloqueos institucionales, consulta su historial o cancela una franja."
       />
 
       <motion.form
@@ -224,33 +219,7 @@ export default function AdminBlocks() {
         </motion.div>
       </motion.form>
 
-      {created.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="font-display text-xl font-semibold text-foreground">Creados en esta sesión</h2>
-          <motion.ul className="space-y-3" {...staggerParent}>
-            {created.map((b) => (
-              <motion.li
-                key={b.key}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 shadow-xs sm:px-5"
-                {...staggerChild}
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-card-foreground">
-                    {b.spaceName} · {formatRange(b.start, b.end - b.start)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {b.recurrent
-                      ? `Desde ${formatDate(b.date)} hasta ${formatDate(b.recurrence.until)}`
-                      : formatDate(b.date)}{' '}
-                    · {b.reason} · {b.createdBlocks} franja(s)
-                  </p>
-                </div>
-                <Badge variant="warning">{b.recurrent ? 'Recurrente' : 'Puntual'}</Badge>
-              </motion.li>
-            ))}
-          </motion.ul>
-        </section>
-      )}
+      <AdminBlockHistory spaces={spaces} loaded={loaded} spacesError={spacesError} reloadSpaces={reload} />
     </div>
   )
 }

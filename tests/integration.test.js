@@ -72,6 +72,7 @@ test('SSE usa Bearer, interpreta availability-changed y no reconecta tras aborta
   const { openEventStream, setToken } = await load('lib/api.js')
   setToken('stream-token')
   let calls = 0
+  let connections = 0
   let signal
   let finish
   const received = new Promise((resolve) => { finish = resolve })
@@ -92,12 +93,13 @@ test('SSE usa Bearer, interpreta availability-changed y no reconecta tras aborta
     assert.deepEqual(data, { spaceId: 'uuid' })
     stop()
     finish()
-  })
+  }, { onConnect: () => { connections++ } })
   t.after(stop)
   await received
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(signal.aborted, true)
   assert.equal(calls, 1)
+  assert.equal(connections, 1)
 })
 
 test('respuestas tardías de otra sesión no invalidan la actual', async (t) => {

@@ -113,7 +113,7 @@ export async function api(path, { method = 'GET', body, form, query, as = 'json'
  * token nunca va en la URL). Llama a `onEvent(name, data)` por cada evento.
  * Devuelve una función para cerrar el flujo.
  */
-export function openEventStream(path, onEvent) {
+export function openEventStream(path, onEvent, { onConnect } = {}) {
   if (DEMO_ENABLED && isDemoToken(token)) return () => {} // sin backend no hay flujo en vivo
   const requestToken = token
   const controller = new AbortController()
@@ -127,8 +127,11 @@ export function openEventStream(path, onEvent) {
         if (!res.ok || !res.body) {
           const error = await parseError(res)
           if (requestToken === token && (res.status === 401 || error.code === 'PROFILE_INCOMPLETE')) emit(error)
+          if (res.status >= 500 || res.status === 429 || (res.ok && !res.body)) throw error
           return
         }
+        if (controller.signal.aborted || requestToken !== token) return
+        onConnect?.()
         const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
         let buffer = ''
         for (;;) {
