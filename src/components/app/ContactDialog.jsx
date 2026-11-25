@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { MessageCircle, Send } from 'lucide-react'
 import Dialog from '@/components/smoothui/dialog'
 import Select from '@/components/smoothui/select'
@@ -10,6 +10,7 @@ import SmoothButton from '@/components/smoothui/smooth-button'
 import { toast } from '@/components/smoothui/toast'
 import { EASE } from '@/lib/anim'
 import { api, errorMessage } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 const SUBJECTS = [
   { label: 'Consulta sobre una reserva', value: 'reserva' },
@@ -84,7 +85,6 @@ function ContactForm({ onSent }) {
 
 /** Botón flotante (abajo a la derecha) que abre el formulario de contacto en un modal; en móvil lo abre la barra inferior. */
 export default function ContactFab({ open, onOpenChange }) {
-  const [hover, setHover] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -94,43 +94,33 @@ export default function ContactFab({ open, onOpenChange }) {
     onOpenChange(true)
     navigate(location.pathname, { replace: true, state: null })
   }, [location.state, location.pathname, navigate, onOpenChange])
-  const expanded = hover && !open
 
   return (
     <>
       <motion.button
         aria-label="Contactar al administrador"
-        className="fixed right-5 bottom-5 z-40 hidden h-14 cursor-pointer items-center overflow-hidden rounded-full bg-sidebar pr-4 pl-4 text-sidebar-foreground shadow-xl shadow-sidebar/25 ring-1 ring-white/10 focus-ring md:right-8 md:bottom-8 md:flex"
+        className={cn(
+          'group fixed right-5 bottom-5 z-40 hidden h-14 cursor-pointer items-center rounded-full bg-sidebar px-4 text-sidebar-foreground shadow-xl shadow-sidebar/25 ring-1 ring-white/10 transition-colors hover:bg-sidebar/90 focus-ring md:right-8 md:bottom-8 md:flex',
+          open && 'pointer-events-none'
+        )}
         initial={{ opacity: 0, scale: 0.6, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.7, ease: EASE, delay: 0.6 }}
-        layout
-        onBlur={() => setHover(false)}
         onClick={() => onOpenChange(true)}
-        onFocus={() => setHover(true)}
-        onHoverEnd={() => setHover(false)}
-        onHoverStart={() => setHover(true)}
         type="button"
         whileTap={{ scale: 0.95 }}
       >
-        <motion.span layout="position" className="relative flex size-6 shrink-0 items-center justify-center">
+        <span className="relative flex size-6 shrink-0 items-center justify-center">
           <MessageCircle className="size-6" />
           <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-sidebar-primary ring-2 ring-sidebar" />
-        </motion.span>
-        <AnimatePresence initial={false}>
-          {expanded && (
-            <motion.span
-              key="label"
-              className="whitespace-nowrap pl-3 text-sm font-medium"
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
-              transition={{ duration: 0.35, ease: EASE }}
-            >
-              Contactar al administrador
-            </motion.span>
-          )}
-        </AnimatePresence>
+        </span>
+        {/* El ancho se anima con CSS (sin `layout`, que deformaba la píldora). */}
+        <span
+          aria-hidden
+          className="max-w-0 overflow-hidden pl-0 text-sm font-medium whitespace-nowrap opacity-0 transition-[max-width,opacity,padding] duration-300 ease-out group-hover:max-w-56 group-hover:pl-3 group-hover:opacity-100 group-focus-visible:max-w-56 group-focus-visible:pl-3 group-focus-visible:opacity-100"
+        >
+          Contactar al administrador
+        </span>
       </motion.button>
 
       <Dialog
