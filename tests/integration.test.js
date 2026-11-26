@@ -72,6 +72,7 @@ test('SSE usa Bearer, interpreta availability-changed y no reconecta tras aborta
   const { openEventStream, setToken } = await load('lib/api.js')
   setToken('stream-token')
   let calls = 0
+  let connections = 0
   let signal
   let finish
   const received = new Promise((resolve) => { finish = resolve })
@@ -92,12 +93,13 @@ test('SSE usa Bearer, interpreta availability-changed y no reconecta tras aborta
     assert.deepEqual(data, { spaceId: 'uuid' })
     stop()
     finish()
-  })
+  }, { onConnect: () => { connections++ } })
   t.after(stop)
   await received
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(signal.aborted, true)
   assert.equal(calls, 1)
+  assert.equal(connections, 1)
 })
 
 test('respuestas tardías de otra sesión no invalidan la actual', async (t) => {
@@ -124,4 +126,28 @@ test('respuestas tardías de otra sesión no invalidan la actual', async (t) => 
   finishStream(json({ code: 'TOKEN_EXPIRED' }, 401))
   await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(problems, [])
+})
+
+test('HTTP: normaliza cuerpos truncados o ilegibles y conserva los abortos explícitos', async (t) => {
+  const { load } = await client(t)
+  const { api, setToken } = await load('lib/api.js')
+  setToken('read-response-token')
+  for (const as of ['json', 'text', 'blob']) {
+    globalThis.fetch = async () => new Response(new ReadableStream({
+      start(controller) {
+        controller.error(new TypeError('La conexión se perdió durante el cuerpo'))
+      },
+    }), { status: 200 })
+    await assert.rejects(api('/admin/blocks/id/cancellation', {
+      method: 'POST', body: { reason: 'Motivo original' }, as,
+    }), { status: 0, code: 'RESPONSE_READ_ERROR' })
+  }
+  globalThis.fetch = async () => new Response('{"id":', { status: 200 })
+  await assert.rejects(api('/admin/blocks'), { status: 0, code: 'RESPONSE_READ_ERROR' })
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.error(new DOMException('Solicitud abortada', 'AbortError'))
+    },
+  }), { status: 200 })
+  await assert.rejects(api('/admin/blocks'), { name: 'AbortError' })
 })

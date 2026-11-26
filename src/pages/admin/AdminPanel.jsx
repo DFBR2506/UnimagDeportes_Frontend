@@ -14,9 +14,10 @@ import WeekCalendar from '@/components/app/WeekCalendar'
 import CourtArt, { courtKind } from '@/components/app/CourtArt'
 import useAdminSpaces from '@/lib/useAdminSpaces'
 import useSpaceImage from '@/lib/useSpaceImage'
+import useAvailabilityRevision from '@/lib/useAvailabilityRevision'
 import { EASE, staggerChild, staggerParent } from '@/lib/anim'
 import { api, errorMessage } from '@/lib/api'
-import { addDays, bogotaParts, formatHour, mapSlot, mondayOf, todayISO } from '@/data/domain'
+import { addDays, bogotaParts, formatHour, mapSlot, todayISO } from '@/data/domain'
 import { cn } from '@/lib/utils'
 
 // semanas consultables alrededor de la actual (/admin/occupancy acepta cualquier fecha)
@@ -40,9 +41,9 @@ const shortDate = (iso) =>
     .replace('.', '')
     .replace(' de ', ' ')
 
-const weekLabel = (monday) => {
-  const sunday = addDays(monday, 6)
-  return `${shortDate(monday)} – ${shortDate(sunday)} ${sunday.slice(0, 4)}`
+const weekLabel = (start) => {
+  const end = addDays(start, 6)
+  return `${shortDate(start)} – ${shortDate(end)} ${end.slice(0, 4)}`
 }
 
 function SpaceThumb({ space }) {
@@ -139,11 +140,11 @@ export default function AdminPanel() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const activeId = spaceId ?? spaces[0]?.id
+  const availabilityRevision = useAvailabilityRevision(activeId)
   const space = spaces.find((s) => s.id === activeId)
   const today = todayISO()
-  const thisMonday = mondayOf(today)
-  const monday = addDays(thisMonday, week * 7)
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+  const weekStart = addDays(today, week * 7)
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
   // UC09 — GET /admin/occupancy por cada día de la semana (solo lectura, RF-14).
   useEffect(() => {
@@ -165,6 +166,7 @@ export default function AdminPanel() {
       )
     )
       .then((entries) => {
+        if (controller.signal.aborted) return
         setSlotsByDate(Object.fromEntries(entries))
         setLoading(false)
       })
@@ -174,9 +176,9 @@ export default function AdminPanel() {
         setLoading(false)
       })
     return () => controller.abort()
-    // `days` se deriva de `monday`
+    // `days` se deriva de `weekStart`
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, monday, reloadKey])
+  }, [activeId, weekStart, reloadKey, availabilityRevision])
 
   const describe = (run) =>
     run.estado === 'bloqueada'
@@ -203,10 +205,10 @@ export default function AdminPanel() {
 
   const weekOptions = Array.from({ length: PAST_WEEKS + NEXT_WEEKS + 1 }, (_, i) => {
     const offset = i - PAST_WEEKS
-    const m = addDays(thisMonday, offset * 7)
+    const start = addDays(today, offset * 7)
     return {
       value: String(offset),
-      label: offset === 0 ? `Esta semana · ${weekLabel(m)}` : weekLabel(m),
+      label: offset === 0 ? `Próximos 7 días · ${weekLabel(start)}` : weekLabel(start),
     }
   })
 
@@ -337,7 +339,7 @@ export default function AdminPanel() {
           </div>
           {week !== 0 && (
             <SmoothButton onClick={() => setWeek(0)} size="sm" variant="outline">
-              Ir a la semana actual
+              Volver a hoy
             </SmoothButton>
           )}
         </div>
