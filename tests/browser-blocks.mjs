@@ -2,6 +2,7 @@
 // Ejecutar: npm run test:browser:blocks (CHROME_PATH permite elegir el binario).
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import http from 'node:http'
@@ -18,6 +19,7 @@ assert.ok(tempRoot, 'Configura TMPDIR para los recursos temporales de prueba.')
 const profile = await mkdtemp(path.join(tempRoot, 'unimag-blocks-browser-'))
 const spaceId = '11111111-1111-4111-8111-111111111111'
 const adminId = '22222222-2222-4222-8222-222222222222'
+const creatorId = '55555555-5555-4555-8555-555555555555'
 const day = new Date(Date.now() - 5 * 3600000 + 86400000).toISOString().slice(0, 10)
 const instant = (hour) => `${day}T${String(hour).padStart(2, '0')}:00:00-05:00`
 const space = { id: spaceId, name: 'Cancha de prueba', capacity: 20, openingTime: '08:00', closingTime: '20:00', status: 'ACTIVE', disciplines: ['BASKETBALL'] }
@@ -35,6 +37,7 @@ const reset = () => {
     id: `33333333-3333-4333-8333-33333333333${index}`, spaceId, type: 'CLASS', reason: 'Clase recurrente',
     startAt: instant(hour), endAt: instant(hour + 1), recurrenceGroup: '44444444-4444-4444-8444-444444444444',
     status: 'ACTIVE', cancelledAt: null, cancelledBy: null, cancellationReason: null,
+    createdBy: creatorId, createdByName: index === 0 ? 'Ana Martínez' : null, cancelledByName: null,
   }))
 }
 reset()
@@ -80,7 +83,7 @@ const backend = http.createServer(async (req, res) => {
     if (fault === 'ended') return send({ code: 'BLOCK_NOT_CANCELLABLE', message: 'La franja terminó durante la confirmación' }, 409)
     if (block.status !== 'CANCELLED') {
       transitions++
-      Object.assign(block, { status: 'CANCELLED', cancelledAt: new Date().toISOString(), cancelledBy: adminId, cancellationReason: reason })
+      Object.assign(block, { status: 'CANCELLED', cancelledAt: new Date().toISOString(), cancelledBy: adminId, cancelledByName: 'Carlos Pérez', cancellationReason: reason })
       for (const stream of streams) stream.write(`event: availability-changed\ndata: ${JSON.stringify({ spaceId })}\n\n`)
     }
     if (fault === 'lost-response') {
@@ -100,7 +103,7 @@ const backend = http.createServer(async (req, res) => {
   if (url.pathname === '/admin/indicators') return send({ from: instant(0), to: instant(23), reservations: 0, lateCancellations: 0, noShows: 0, suspendedUsers: 0 })
   return send({ code: 'NOT_FOUND', message: 'Sin imagen de prueba' }, 404)
 })
-let vite, chrome, socket
+let vite, chrome, chromeClosed, socket
 const commands = new Map()
 let sequence = 0
 const exceptions = []
@@ -136,10 +139,24 @@ const fill = (selector, value) => evaluate(`(() => {
   element.dispatchEvent(new Event('change', { bubbles: true }));
 })()`)
 const screenshot = async (name) => {
-  const { data } = await cdp('Page.captureScreenshot', { format: 'png' })
+  let data
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      ({ data } = await cdp('Page.captureScreenshot', { format: 'png' }))
+      break
+    } catch (error) {
+      if (attempt === 2 || !error.message.includes('Unable to capture screenshot')) throw error
+      // Chrome puede rechazar una captura mientras termina el desplazamiento.
+      await delay(200)
+    }
+  }
   const output = path.join(tempRoot, `unimag-blocks-${name}.png`)
   await writeFile(output, Buffer.from(data, 'base64'))
   console.log(`Captura: ${output}`)
+}
+const assertNoVisibleUUID = async () => {
+  const text = await evaluate('document.body.innerText')
+  assert.doesNotMatch(text, /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i, 'UUID expuesto como texto')
 }
 
 try {
@@ -156,6 +173,7 @@ try {
   await vite.listen()
   const origin = `http://127.0.0.1:${vite.httpServer.address().port}`
   chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' })
+  chromeClosed = once(chrome, 'close')
   const { readFile } = await import('node:fs/promises')
   let port
   for (let index = 0; index < 100; index++) {
@@ -187,12 +205,15 @@ try {
     await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
     await cdp('Page.navigate', { url: `${origin}/admin/bloqueos` })
     await waitFor("document.body.innerText.includes('2 bloqueo(s) encontrados')")
+    await waitFor("document.body.innerText.includes('Ana Martínez') && document.body.innerText.includes('Administrador no disponible')")
+    await assertNoVisibleUUID()
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `${name}: desbordamiento horizontal`)
     await click('Cancelar bloqueo')
     await waitFor("!!document.querySelector('#block-cancellation-reason')")
     assert.equal(await evaluate("document.querySelector('button[type=submit][disabled]') !== null"), true)
     assert.ok(await evaluate("document.body.innerText.includes('Las reservas canceladas anteriormente no se reactivarán.')"))
     await fill('#block-cancellation-reason', `Motivo ${name}`)
+    await assertNoVisibleUUID()
     await screenshot(`${name}-confirmation`)
     // El foco debe permanecer dentro del diálogo al navegar con teclado.
     await evaluate("document.querySelector('#block-cancellation-reason').focus()")
@@ -208,13 +229,15 @@ try {
     assert.equal(await evaluate("document.querySelector('#block-cancellation-reason').value"), `Motivo ${name}`)
     assert.equal(await evaluate("document.querySelector('#block-cancellation-reason').readOnly"), true)
     await click('Confirmar cancelación')
-    await waitFor("document.body.innerText.includes('Bloqueo cancelado.') && document.body.innerText.includes('Administrador que canceló (UUID)')")
+    await waitFor("document.body.innerText.includes('Bloqueo cancelado.') && document.body.innerText.includes('Cancelado por:')")
     assert.equal(transitions, 1)
     assert.equal(blocks[1].status, 'ACTIVE')
-    await waitFor("document.body.innerText.includes('22222222-2222-4222-8222-222222222222') && !document.querySelector('[aria-busy=true]')")
+    await waitFor("document.body.innerText.includes('Carlos Pérez') && !document.querySelector('[aria-busy=true]')")
+    await assertNoVisibleUUID()
+    assert.ok(requests.some((request) => request.path === `/admin/blocks/${blocks[0].id}/cancellation`), 'La petición debe conservar el ID interno')
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
     assert.equal(await evaluate("document.activeElement.id === 'block-history-heading'"), true, 'El foco no volvió al historial')
-    await evaluate("[...document.querySelectorAll('li')].find(node => node.textContent.includes('Administrador que canceló (UUID)')).scrollIntoView({ block: 'center' })")
+    await evaluate("[...document.querySelectorAll('li')].find(node => node.textContent.includes('Cancelado por:')).scrollIntoView({ block: 'center' })")
     await screenshot(`${name}-history`)
     await evaluate("document.querySelector('[aria-label=\"Estado del bloqueo\"]').click()")
     await click('Cancelado', '[role=option]')
@@ -224,7 +247,10 @@ try {
     await click('Todos', '[role=option]')
     await waitFor("document.body.innerText.includes('2 bloqueo(s) encontrados')")
     await click('Cancelar bloqueo')
+    await waitFor("!!document.querySelector('#block-cancellation-reason')")
     await fill('#block-cancellation-reason', 'La franja termina mientras confirmo')
+    await waitFor("document.querySelector('[role=dialog]')?.innerText.includes('Administrador no disponible')")
+    await assertNoVisibleUUID()
     fault = 'ended'
     await click('Confirmar cancelación')
     await waitFor("document.body.innerText.includes('La franja terminó durante la confirmación')")
@@ -253,9 +279,10 @@ try {
     socket.close()
   }
   chrome?.kill()
+  if (chromeClosed) await chromeClosed
   for (const stream of streams) stream.end()
   await vite?.close()
   backend.closeAllConnections()
   await new Promise((resolve) => backend.close(resolve))
-  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
 }

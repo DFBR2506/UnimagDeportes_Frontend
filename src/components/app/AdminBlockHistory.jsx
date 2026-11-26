@@ -1,20 +1,54 @@
 import { useEffect, useRef, useState } from 'react'
+import { CalendarDays } from 'lucide-react'
 import Badge from '@/components/smoothui/badge'
 import Dialog from '@/components/smoothui/dialog'
+import Empty from '@/components/smoothui/empty'
 import Field, { FieldLabel } from '@/components/smoothui/field'
 import Input from '@/components/smoothui/input'
 import Select from '@/components/smoothui/select'
+import Skeleton from '@/components/smoothui/skeleton'
 import SmoothButton from '@/components/smoothui/smooth-button'
 import Textarea from '@/components/smoothui/textarea'
 import { BLOCK_TYPES, addDays, todayISO } from '@/data/domain'
 import { errorMessage } from '@/lib/api'
 import { notifyAvailabilityChanged } from '@/lib/availabilityEvents'
-import { canCancelBlock, cancelBlock, cancellationReasonLength, formatBlockInstant, listBlocks } from '@/lib/blocks'
+import { administratorName, canCancelBlock, cancelBlock, cancellationReasonLength, formatBlockInstant, listBlocks } from '@/lib/blocks'
 import useAvailabilityRevision from '@/lib/useAvailabilityRevision'
 import { useApp } from '@/store'
 
 const blockRange = (block) =>
   `${formatBlockInstant(block.startAt)} – ${formatBlockInstant(block.endAt)} (America/Bogota)`
+
+const blockDateFormat = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota', day: 'numeric', month: 'numeric', year: 'numeric',
+})
+const blockTimeFormat = new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota', timeStyle: 'short',
+})
+
+function BlockSchedule({ block }) {
+  const start = new Date(block.startAt)
+  const end = new Date(block.endAt)
+  return (
+    <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm leading-relaxed text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <dt className="flex items-center gap-2 font-medium">
+          <CalendarDays aria-hidden="true" className="size-4 shrink-0" />
+          Fecha:
+        </dt>
+        <dd>{blockDateFormat.formatRange(start, end)}</dd>
+      </div>
+      <div className="flex flex-wrap gap-x-1">
+        <dt className="font-medium">Hora inicio:</dt>
+        <dd><time dateTime={block.startAt}>{blockTimeFormat.format(start)}</time></dd>
+      </div>
+      <div className="flex flex-wrap gap-x-1">
+        <dt className="font-medium">Hora fin:</dt>
+        <dd><time dateTime={block.endAt}>{blockTimeFormat.format(end)}</time></dd>
+      </div>
+    </dl>
+  )
+}
 
 export default function AdminBlockHistory({ spaces, loaded, spacesError, reloadSpaces }) {
   const { isAdmin, token, withReauth } = useApp()
@@ -126,7 +160,7 @@ export default function AdminBlockHistory({ spaces, loaded, spacesError, reloadS
 
   if (!isAdmin) return null
 
-  const spaceName = (id) => spaces.find((space) => space.id === id)?.name ?? id
+  const spaceName = (id) => spaces.find((space) => space.id === id)?.name?.trim() || 'Espacio no disponible'
   const reasonLength = cancellationReasonLength(reason)
   const noLongerEligible = selected && !retryIntent && !canCancelBlock(selected, now)
   const terminalError = ['BLOCK_NOT_FOUND', 'BLOCK_NOT_CANCELLABLE'].includes(cancelError?.code)
@@ -138,11 +172,11 @@ export default function AdminBlockHistory({ spaces, loaded, spacesError, reloadS
           Bloqueos e historial
         </h2>
         <p className="text-sm text-muted-foreground">
-          Consulta las franjas por espacio. “No cancelado” también incluye bloqueos que ya terminaron.
+           Consulta las franjas por espacio. “No cancelado” también incluye bloqueos que ya terminaron. Las horas se muestran en hora de Bogotá.
         </p>
       </div>
-      <div className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Field>
+      <div className="grid gap-x-4 gap-y-5 rounded-2xl border border-border bg-card p-4 shadow-xs sm:grid-cols-2 sm:p-5 lg:grid-cols-6">
+        <Field className="lg:col-span-2">
           <FieldLabel>Espacio del historial</FieldLabel>
           <Select
             aria-label="Espacio del historial"
@@ -182,7 +216,7 @@ export default function AdminBlockHistory({ spaces, loaded, spacesError, reloadS
       {!validRange && <p role="alert" className="text-sm text-destructive-ink">Indica ambas fechas; el último día no puede ser anterior al primero.</p>}
       {notice && <p role="status" className="break-words rounded-xl bg-surface-success p-4 text-sm">{notice}</p>}
       {spacesError || error ? (
-        <div role="alert" className="space-y-3">
+        <div role="alert" className="space-y-3 rounded-xl border border-destructive/20 bg-surface-danger p-5">
           <p className="text-sm text-destructive-ink">
             {notice ? 'La cancelación se registró, pero no se pudo actualizar el historial. ' : ''}
             {errorMessage(spacesError ?? error)}
@@ -193,49 +227,78 @@ export default function AdminBlockHistory({ spaces, loaded, spacesError, reloadS
         </div>
       ) : (
         <div aria-busy={validRange && loading}>
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="text-sm font-medium text-muted-foreground">
             {!validRange ? '' : loading || !loaded ? 'Consultando bloqueos…' : page ? `${page.totalElements} bloqueo(s) encontrados` : spaces.length === 0 ? 'No hay espacios registrados.' : ''}
           </p>
-          {page?.items.length === 0 && <p className="py-6 text-sm text-muted-foreground">No hay bloqueos para estos filtros.</p>}
+          {validRange && (loading || !loaded) && (
+            <div aria-hidden="true" className="mt-4 space-y-3">
+              <Skeleton className="h-40 w-full rounded-xl" />
+              <Skeleton className="h-40 w-full rounded-xl" />
+            </div>
+          )}
+          {validRange && page?.items.length === 0 && (
+            <Empty
+              className="mt-4 rounded-xl border border-border bg-card"
+              title="No hay bloqueos para estos filtros."
+              description="Prueba con otro espacio, intervalo de fechas o estado."
+            />
+          )}
           <ul className="mt-4 space-y-3">
             {validRange && page?.items.map((block) => (
-              <li key={block.id} className="min-w-0 space-y-3 rounded-xl border border-border bg-card p-4 sm:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="font-medium text-card-foreground">{spaceName(block.spaceId)}</h3>
-                    <p className="text-sm">{blockRange(block)}</p>
-                    <p className="break-words text-sm text-muted-foreground">{BLOCK_TYPES.find((type) => type.value === block.type)?.label ?? block.type} · {block.reason}</p>
+              <li key={block.id} className="min-w-0 space-y-4 rounded-xl border border-border bg-card p-4 shadow-xs sm:p-5">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <h3 className="break-words font-display text-base font-semibold text-card-foreground">{spaceName(block.spaceId)}</h3>
+                    <BlockSchedule block={block} />
                   </div>
-                  <Badge variant={block.status === 'CANCELLED' ? 'secondary' : 'warning'}>
-                    {block.status === 'CANCELLED' ? 'Cancelado' : 'No cancelado'}
-                  </Badge>
+                  <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-start">
+                    {block.status === 'CANCELLED' && (
+                      <Badge variant="outline" className="border-destructive/20 bg-surface-danger text-destructive-ink">
+                        Cancelado
+                      </Badge>
+                    )}
+                    {canCancelBlock(block, now) && (
+                      <Badge variant="outline" className="border-blue/20 bg-surface-info text-blue-ink">
+                        Bloqueo activo
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <dl className="space-y-1 text-xs text-muted-foreground">
-                  <div><dt className="inline font-medium">ID: </dt><dd className="inline break-all">{block.id}</dd></div>
-                  {block.recurrenceGroup && <div><dt className="inline font-medium">Grupo recurrente: </dt><dd className="inline break-all">{block.recurrenceGroup}</dd></div>}
-                </dl>
+                <div className="space-y-2 border-t border-border/70 pt-4">
+                  <p className="text-xs font-medium text-blue-ink">
+                    {BLOCK_TYPES.find((type) => type.value === block.type)?.label ?? block.type}
+                  </p>
+                  <p className="break-words text-sm leading-relaxed text-card-foreground">{block.reason}</p>
+                  <dl className="text-xs leading-relaxed text-muted-foreground">
+                    <div><dt className="inline font-medium">Creado por: </dt><dd className="inline break-words">{administratorName(block.createdByName)}</dd></div>
+                  </dl>
+                </div>
                 {block.status === 'CANCELLED' ? (
-                  <dl className="space-y-2 border-t border-border pt-3 text-sm">
-                    <div><dt className="font-medium">Administrador que canceló (UUID)</dt><dd className="break-all text-muted-foreground">{block.cancelledBy}</dd></div>
-                    <div><dt className="font-medium">Fecha de cancelación</dt><dd className="text-muted-foreground">{formatBlockInstant(block.cancelledAt)} (America/Bogota)</dd></div>
-                    <div><dt className="font-medium">Motivo de cancelación</dt><dd className="break-words text-muted-foreground">{block.cancellationReason}</dd></div>
+                  <dl className="grid gap-x-6 gap-y-4 rounded-lg bg-muted/60 p-4 text-sm sm:grid-cols-2 [&>div]:min-w-0">
+                    <div><dt className="font-medium">Cancelado por: </dt><dd className="mt-1 break-words text-muted-foreground">{administratorName(block.cancelledByName)}</dd></div>
+                    <div><dt className="font-medium">Fecha de cancelación</dt><dd className="mt-1 text-muted-foreground">{formatBlockInstant(block.cancelledAt)} (America/Bogota)</dd></div>
+                    <div className="sm:col-span-2"><dt className="font-medium">Motivo de cancelación</dt><dd className="mt-1 break-words leading-relaxed text-muted-foreground">{block.cancellationReason}</dd></div>
                   </dl>
                 ) : canCancelBlock(block, now) ? (
-                  <SmoothButton className="max-sm:w-full" variant="outline" disabled={saving} onClick={() => selectBlock(block)}>
-                    Cancelar bloqueo
-                  </SmoothButton>
-                ) : <p className="text-sm text-muted-foreground">Franja finalizada: no admite una primera cancelación.</p>}
+                  <div className="flex justify-end border-t border-border/70 pt-4">
+                    <SmoothButton className="max-sm:w-full" color="destructive" size="sm" variant="soft" disabled={saving} onClick={() => selectBlock(block)}>
+                      Cancelar bloqueo
+                    </SmoothButton>
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-muted/60 px-4 py-3 text-xs leading-relaxed text-muted-foreground">Franja finalizada: no admite una primera cancelación.</p>
+                )}
               </li>
             ))}
           </ul>
         </div>
       )}
       {page && validRange && (
-        <nav aria-label="Paginación de bloqueos" className="flex flex-wrap items-center gap-3">
+        <nav aria-label="Paginación de bloqueos" className="flex flex-wrap items-center justify-center gap-3 border-t border-border pt-5 sm:justify-start">
           <SmoothButton variant="outline" disabled={loading || page.page === 0} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}>Anterior</SmoothButton>
           <p className="text-sm">Página {page.page + 1} de {Math.max(1, Math.ceil(page.totalElements / page.size))}</p>
           <SmoothButton variant="outline" disabled={loading || (page.page + 1) * page.size >= page.totalElements} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>Siguiente</SmoothButton>
-          <SmoothButton variant="ghost" disabled={loading} onClick={() => setReloadKey((value) => value + 1)}>Actualizar historial</SmoothButton>
+          <SmoothButton className="max-sm:w-full sm:ml-auto" variant="ghost" disabled={loading} onClick={() => setReloadKey((value) => value + 1)}>Actualizar historial</SmoothButton>
         </nav>
       )}
       <Dialog
@@ -252,7 +315,7 @@ export default function AdminBlockHistory({ spaces, loaded, spacesError, reloadS
             <div className="space-y-1 text-sm">
               <p className="font-medium">{spaceName(selected.spaceId)}</p>
               <p>{blockRange(selected)}</p>
-              <p className="break-all text-xs text-muted-foreground">ID: {selected.id}</p>
+              <p className="break-words text-muted-foreground">Creado por: {administratorName(selected.createdByName)}</p>
               <p className="break-words text-muted-foreground">Motivo original: {selected.reason}</p>
             </div>
             <p className="rounded-lg bg-surface-warning p-3 text-sm font-medium">Las reservas canceladas anteriormente no se reactivarán.</p>

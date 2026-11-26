@@ -70,10 +70,15 @@ test('demo: listado por solape, historial e idempotencia sin reactivar reservas 
   const overlap = await api('/admin/blocks', { query: { ...query, from: toInstant(day, 8), to: toInstant(day, 9) } })
   assert.equal(overlap.totalElements, 1)
   const block = overlap.items[0]
+  assert.equal(block.createdBy, 'demo-admin')
+  assert.equal(block.createdByName, 'Equipo de Deportes')
+  assert.equal(block.cancelledByName, null)
   const path = `/admin/blocks/${block.id}/cancellation`
   const cancelled = await api(path, { method: 'POST', body: { reason: '  Cancelación original  ' } })
   assert.equal(cancelled.status, 'CANCELLED')
   assert.equal(cancelled.cancelledBy, 'demo-admin')
+  assert.equal(cancelled.createdByName, 'Equipo de Deportes')
+  assert.equal(cancelled.cancelledByName, 'Equipo de Deportes')
   assert.equal(cancelled.cancellationReason, 'Cancelación original')
   for (const key of ['id', 'spaceId', 'type', 'reason', 'startAt', 'endAt', 'recurrenceGroup']) {
     assert.equal(cancelled[key], block[key])

@@ -237,8 +237,11 @@ const blockDto = (block) => ({
     : toInstant(block.date, block.endHour)),
   recurrenceGroup: block.recurrenceGroup ?? null,
   status: block.status ?? 'ACTIVE',
+  createdBy: block.createdBy ?? null,
+  createdByName: Object.values(USERS).find((user) => user.id === block.createdBy)?.name?.trim() || null,
   cancelledAt: block.cancelledAt ?? null,
   cancelledBy: block.cancelledBy ?? null,
+  cancelledByName: (block.status === 'CANCELLED' && Object.values(USERS).find((user) => user.id === block.cancelledBy)?.name?.trim()) || null,
   cancellationReason: block.cancellationReason ?? null,
 })
 
@@ -853,7 +856,7 @@ route('POST', '/admin/blocks/:id/cancellation', ({ s, params, body, user }) => {
   return blockDto(block)
 })
 
-route('POST', '/admin/blocks', ({ s, body }) => {
+route('POST', '/admin/blocks', ({ s, body, user }) => {
   const space = getSpace(s, body?.spaceId)
   const fields = {}
   if (!['CLASS', 'EVENT', 'MAINTENANCE'].includes(body.type)) fields.type = 'valor inválido'
@@ -894,7 +897,7 @@ route('POST', '/admin/blocks', ({ s, body }) => {
         id: crypto.randomUUID(), spaceId: space.id, type: body.type, reason: body.reason.trim(),
         startAt: toInstant(date, hour),
         endAt: hour === 23 ? toInstant(addDays(date, 1), 0) : toInstant(date, hour + 1),
-        recurrenceGroup, status: 'ACTIVE', cancelledAt: null, cancelledBy: null, cancellationReason: null,
+        recurrenceGroup, status: 'ACTIVE', createdBy: user.id, cancelledAt: null, cancelledBy: null, cancellationReason: null,
       })
     }
   }
