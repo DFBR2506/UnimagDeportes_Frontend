@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({ api: vi.fn() }))
 import { api } from '@/lib/api'
-import { canCancelBlock, cancelBlock, cancellationReasonLength, formatBlockInstant, listBlocks } from '@/lib/blocks'
+import { administratorName, canCancelBlock, cancelBlock, cancellationReasonLength, formatBlockInstant, listBlocks } from '@/lib/blocks'
 
 beforeEach(() => api.mockReset())
 
@@ -40,4 +40,22 @@ it('presenta fecha, año y hora en Bogotá sin depender de la zona del navegador
   expect(text).toContain('25')
   expect(text).toContain('2026')
   expect(text).toMatch(/8:30:00|20:30:00/)
+})
+
+it('presenta el nombre recortado o el respaldo sin sustituirlo por un identificador', () => {
+  expect(administratorName('  Ana Martínez  ')).toBe('Ana Martínez')
+  for (const name of [null, undefined, '', ' \n ']) {
+    expect(administratorName(name)).toBe('Administrador no disponible')
+  }
+})
+
+it('preserva los nuevos campos de identidad y nombre en listado y cancelación', async () => {
+  const block = {
+    id: 'block', createdBy: 'creator-id', createdByName: 'Ana Martínez',
+    cancelledBy: 'canceller-id', cancelledByName: 'Carlos Pérez',
+  }
+  const page = { items: [block], page: 0, size: 20, totalElements: 1 }
+  api.mockResolvedValueOnce(page).mockResolvedValueOnce(block)
+  expect(await listBlocks({ spaceId: 'space', from: '2026-11-01', through: '2026-11-30', page: 0, size: 20 })).toBe(page)
+  expect(await cancelBlock('block', 'Motivo')).toBe(block)
 })
